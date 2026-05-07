@@ -1,1 +1,24 @@
 .env
+.env.local
+.env.production
+.env.*.local
+
+# Data volumes - don't track persistent data
+/opt/affine/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies
+node_modules/
