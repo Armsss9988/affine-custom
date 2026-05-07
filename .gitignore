@@ -58,7 +58,7 @@ Thumbs.db
 *.env.local
 *.local.env
 .history
-
+.env
 .next
 .vercel
 out/
