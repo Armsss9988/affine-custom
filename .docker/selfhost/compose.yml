@@ -3,8 +3,9 @@ services:
   affine:
     image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
     container_name: affine_server
-    ports:
-      - '${PORT:-3010}:3010'
+    # Port 3010 exposed internally only; Nginx handles public traffic on port 80
+    expose:
+      - '3010'
     depends_on:
       redis:
         condition: service_healthy
@@ -22,6 +23,41 @@ services:
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
       - AFFINE_INDEXER_ENABLED=false
+    restart: unless-stopped
+
+  chatbot:
+    build:
+      context: ./chatbot
+      dockerfile: Dockerfile
+    container_name: affine_chatbot
+    expose:
+      - '3099'
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
+      - NIM_API_KEY=${NIM_API_KEY}
+      - NIM_BASE_URL=${NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      - NIM_LLM_MODEL=${NIM_LLM_MODEL:-meta/llama-3.1-70b-instruct}
+      - NIM_EMBEDDING_MODEL=${NIM_EMBEDDING_MODEL:-nvidia/nv-embedqa-e5-v5}
+      - CHATBOT_PORT=3099
+    volumes:
+      - ./chatbot/knowledge:/app/knowledge
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: affine_nginx
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - affine
+      - chatbot
     restart: unless-stopped
 
   affine_migration:
