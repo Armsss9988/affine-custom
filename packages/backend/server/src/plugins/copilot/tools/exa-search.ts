@@ -2,6 +2,7 @@ import Exa from 'exa-js';
 import { z } from 'zod';
 
 import { Config } from '../../../base';
+import { getConfiguredExaKey } from './exa-config';
 import { toolError } from './error';
 import { defineTool } from './tool';
 
@@ -13,11 +14,18 @@ export const createExaSearchTool = (config: Config) => {
       query: z.string().describe('The query to search the web for.'),
       mode: z
         .enum(['MUST', 'AUTO'])
+        .optional()
         .describe('The mode to search the web for.'),
     }),
     execute: async ({ query, mode }) => {
       try {
-        const { key } = config.copilot.exa;
+        const key = getConfiguredExaKey(config);
+        if (!key) {
+          return toolError(
+            'Exa Search Failed',
+            'Exa API key is not configured.'
+          );
+        }
         const exa = new Exa(key);
         const result = await exa.search(query, {
           contents: {
@@ -29,7 +37,7 @@ export const createExaSearchTool = (config: Config) => {
         return result.results.map(data => ({
           title: data.title,
           url: data.url,
-          content: data.summary,
+          content: data.summary ?? '',
           favicon: data.favicon,
           publishedDate: data.publishedDate,
           author: data.author,

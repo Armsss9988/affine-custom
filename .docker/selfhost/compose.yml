@@ -3,9 +3,9 @@ services:
   affine:
     image: ghcr.io/armsss9988/affine-custom:stable-custom
     container_name: affine_server
-    # Port 3010 exposed internally only; Nginx handles public traffic on port 80
-    expose:
-      - '3010'
+    # Port 3010 exposed to host so local yarn dev can proxy to it
+    ports:
+      - '3010:3010'
     depends_on:
       redis:
         condition: service_healthy
@@ -32,8 +32,8 @@ services:
       context: ./chatbot
       dockerfile: Dockerfile
     container_name: affine_chatbot
-    expose:
-      - '3099'
+    ports:
+      - '3099:3099'
     env_file:
       - .env
     environment:

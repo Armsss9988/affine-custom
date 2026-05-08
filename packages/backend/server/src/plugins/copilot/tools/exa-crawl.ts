@@ -2,6 +2,7 @@ import Exa from 'exa-js';
 import { z } from 'zod';
 
 import { Config } from '../../../base';
+import { getConfiguredExaKey } from './exa-config';
 import { toolError } from './error';
 import { defineTool } from './tool';
 
@@ -15,7 +16,13 @@ export const createExaCrawlTool = (config: Config) => {
     }),
     execute: async ({ url }) => {
       try {
-        const { key } = config.copilot.exa;
+        const key = getConfiguredExaKey(config);
+        if (!key) {
+          return toolError(
+            'Exa Crawl Failed',
+            'Exa API key is not configured.'
+          );
+        }
         const exa = new Exa(key);
         const result = await exa.getContents([url], {
           livecrawl: 'always',

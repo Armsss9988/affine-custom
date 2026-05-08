@@ -38,20 +38,21 @@ router.use((req, res, next) => {
 
 // ─── Helpers ───────────────────────────────────────────────
 
-/**
- * Convert OpenAI Responses API "input" to Chat Completions "messages"
- * The Responses API sends input as either a string or an array of items.
- */
-function responsesInputToMessages(input, instructions) {
+function responsesInputToMessages(input, instructions, hasTools = false) {
   const messages = [];
 
-  // Add system instructions if present
   let systemPrompt = instructions || '';
   if (systemPrompt) {
-    systemPrompt += '\n\nIMPORTANT: You have access to tools (functions). If the user asks you to create, read, search, or modify documents, you MUST use the provided tools instead of just telling the user you will do it. For example, if asked to create a document, use the doc_compose or docCreate tool immediately.';
+    if (hasTools) {
+      systemPrompt += '\n\nIMPORTANT: You have access to tools. Call the appropriate tool immediately. Do NOT retry a failed tool indefinitely.';
+    } else {
+      systemPrompt += '\n\nOutput ONLY the final user-facing content. Do NOT include reasoning, analysis, <think> tags, or conversational filler like "Okay" or "I understand".';
+    }
     messages.push({ role: 'system', content: systemPrompt });
+  } else if (hasTools) {
+    messages.push({ role: 'system', content: 'You are a helpful assistant with tools.' });
   } else {
-    messages.push({ role: 'system', content: 'You are a helpful assistant. You have access to tools. If the user asks you to create, read, search, or modify documents, you MUST use the provided tools instead of just telling the user you will do it.' });
+    messages.push({ role: 'system', content: 'Output only the final user-facing content. Do not include reasoning, analysis, or <think> tags.' });
   }
 
   if (typeof input === 'string') {
@@ -113,7 +114,7 @@ function genResponseId() {
 //    so AFFiNE's model picker always finds a valid option
 router.get('/models', (req, res) => {
   const ts = Math.floor(Date.now() / 1000);
-  const aliases = ['gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gemini-2.5-flash', 'gemini-2.0-flash', 'claude-3-5-sonnet'];
+  const aliases = ['gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gemini-2.5-flash', 'gemini-2.0-flash', 'claude-3-5-sonnet', 'gemini-embedding-001', 'text-embedding-3-small'];
   
   console.log(`[Models Endpoint] req.originalUrl=${req.originalUrl}, req.baseUrl=${req.baseUrl}`);
   
@@ -226,10 +227,7 @@ router.post('/responses', async (req, res) => {
   }
 
   try {
-    // Convert Responses API input → Chat Completions messages
-    const messages = responsesInputToMessages(input, instructions);
-
-    // Map tools to Chat Completions format
+    // Map tools to Chat Completions format FIRST so we know whether tools are present
     let openaiTools = [];
     if (tools && Array.isArray(tools)) {
       openaiTools = tools.filter(t => t.type === 'function' && t.name).map(t => ({
@@ -242,6 +240,16 @@ router.post('/responses', async (req, res) => {
       }));
       console.log(`[Copilot Responses] mapped ${openaiTools.length} function tools for NIM`);
     }
+    const hasTools = openaiTools.length > 0;
+
+    // Convert Responses API input → Chat Completions messages with hasTools flag
+    const messages = responsesInputToMessages(input, instructions, hasTools);
+
+    const nimOptions = {
+      temperature: temperature ?? 0.7,
+      max_tokens: max_tokens ?? 10000,
+      tools: hasTools ? openaiTools : undefined
+    };
 
     if (stream) {
       // ── Streaming Responses API (SSE) ──
@@ -277,12 +285,6 @@ router.post('/responses', async (req, res) => {
       res.write(`data: ${JSON.stringify({ type: 'response.content_part.added', output_index: 0, content_index: 0, part: contentPart })}\n\n`);
 
       // Stream from NIM
-      const nimOptions = { temperature, max_tokens };
-      if (openaiTools.length > 0) {
-        nimOptions.tools = openaiTools;
-        nimOptions.tool_choice = toolChoice || 'auto';
-      }
-      
       const nimStream = await chatStream(messages, nimOptions);
       const reader = nimStream.getReader ? nimStream.getReader() : null;
       let fullText = '';
@@ -519,11 +521,6 @@ router.post('/responses', async (req, res) => {
 
     } else {
       // ── Non-streaming Responses API ──
-      const nimOptions = { temperature, max_tokens };
-      if (openaiTools.length > 0) {
-        nimOptions.tools = openaiTools;
-        nimOptions.tool_choice = toolChoice || 'auto';
-      }
       const content = await chatComplete(messages, nimOptions);
 
       const responseObj = {
@@ -559,6 +556,278 @@ router.post('/responses', async (req, res) => {
     } else {
       res.end();
     }
+  }
+});
+
+// 4a. Gemini Embedding API (batchEmbedContents)
+//     Converts Gemini embedding format → NIM OpenAI embedding format → Gemini format back
+router.post('/models/:modelName\\:batchEmbedContents', async (req, res) => {
+  const { modelName } = req.params;
+  const { requests } = req.body;
+  const requestId = genResponseId();
+
+  console.log(`[Copilot Gemini Embed] ${requestId} model=${modelName} requests=${(requests||[]).length}`);
+
+  if (!requests || !Array.isArray(requests) || requests.length === 0) {
+    return res.json({ embeddings: [] });
+  }
+
+  try {
+    const { embedText } = require('./nim');
+
+    // Extract texts from Gemini format: requests[].content.parts[].text
+    const texts = requests.map(r => {
+      const parts = r.content?.parts || [];
+      return parts.map(p => p.text || '').join(' ').trim() || 'empty';
+    });
+
+    // Call NIM embedding for each text (batch)
+    const embeddings = await Promise.all(texts.map(async (text) => {
+      try {
+        const vector = await embedText(text);
+        return { values: vector };
+      } catch (e) {
+        console.error(`[Copilot Gemini Embed] ${requestId} embedding error:`, e.message);
+        // Return zero vector on error
+        return { values: new Array(256).fill(0) };
+      }
+    }));
+
+    res.json({ embeddings });
+    console.log(`[Copilot Gemini Embed] ${requestId} completed ${embeddings.length} embeddings`);
+  } catch (err) {
+    console.error(`[Copilot Gemini Embed] ${requestId} Error:`, err.message);
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
+// 4b. Gemini API format interceptor (used when AFFiNE uses gemini provider)
+//    Path example: /models/gemini-2.5-flash:streamGenerateContent
+router.post('/models/:modelName\\::action', async (req, res) => {
+  const { modelName, action } = req.params;
+  const isStream = action === 'streamGenerateContent';
+  const { contents, systemInstruction, generationConfig, tools } = req.body;
+  const requestId = genResponseId();
+  
+  console.log(`[Copilot Gemini Proxy] ${requestId} model=${modelName} action=${action} stream=${isStream}`);
+  
+  try {
+    // Build tool list FIRST so we know whether to inject tool instructions
+    let openaiTools = [];
+    if (tools && tools[0]?.functionDeclarations) {
+      openaiTools = tools[0].functionDeclarations.map(t => ({
+        type: 'function',
+        function: { name: t.name, description: t.description || '', parameters: t.parameters || {} }
+      }));
+    }
+    const hasTools = openaiTools.length > 0;
+
+    const messages = [];
+    let sysText = systemInstruction?.parts?.[0]?.text || 'You are a helpful assistant.';
+    // Only inject tool instructions when the request actually has tools.
+    // Sub-calls like "Write an article" have NO tools — we must not inject anything
+    // or the model will output reasoning headers / tool instructions inside the doc.
+    if (hasTools) {
+      sysText += '\n\nIMPORTANT: You have access to tools. Call the appropriate tool immediately. Do NOT retry a failed tool indefinitely.';
+    } else {
+      sysText += '\n\nOutput ONLY the final user-facing content. Do NOT include reasoning, analysis, <think> tags, or conversational filler like "Okay" or "I understand".';
+    }
+    messages.push({ role: 'system', content: sysText });
+    
+    // Track tool_call_ids so we can pair functionCall with functionResponse
+    const toolCallIdMap = {}; // functionName -> id
+    let toolCallCounter = 0;
+
+    if (contents && Array.isArray(contents)) {
+      for (const c of contents) {
+        const parts = Array.isArray(c.parts) ? c.parts : [];
+        const funcRespParts = parts.filter(p => p.functionResponse);
+        if (funcRespParts.length > 0) {
+          for (const part of funcRespParts) {
+            const respName = part.functionResponse.name || '';
+            const matchedId = toolCallIdMap[respName] || ('call_' + respName + '_' + (++toolCallCounter));
+            messages.push({
+              role: 'tool',
+              tool_call_id: matchedId,
+              content: JSON.stringify(part.functionResponse.response || {})
+            });
+          }
+          continue;
+        }
+
+        if (c.role === 'model' || c.role === 'assistant') {
+          // Check for function calls
+          const funcCallParts = parts.filter(p => p.functionCall);
+          if (funcCallParts.length > 0) {
+            const tool_calls = funcCallParts.map(p => {
+              const name = p.functionCall.name;
+              const id = 'call_' + name + '_' + (++toolCallCounter);
+              toolCallIdMap[name] = id; // track latest id for this function name
+              return {
+                id,
+                type: 'function',
+                function: { name, arguments: JSON.stringify(p.functionCall.args || {}) }
+              };
+            });
+            messages.push({
+              role: 'assistant',
+              content: null,
+              tool_calls
+            });
+            continue;
+          }
+        }
+        
+        const text = parts.map(p => p.text).filter(Boolean).join('') || '';
+        if (text) {
+          messages.push({
+            role: c.role === 'model' ? 'assistant' : 'user',
+            content: text
+          });
+        }
+      }
+    }
+    
+    const nimOptions = {
+      temperature: generationConfig?.temperature ?? 0.3,
+      max_tokens: generationConfig?.maxOutputTokens ?? 4096,
+      tools: hasTools ? openaiTools : undefined
+    };
+    
+    console.log(`[Copilot Gemini Proxy] ${requestId} sending ${messages.length} messages to NIM.`);
+    for (const m of messages) {
+      if (m.tool_calls) {
+        console.log(`[Copilot Gemini Proxy] ${requestId}   [assistant tool_calls]:`, m.tool_calls.map(tc => `${tc.function.name}(${tc.id})`).join(', '));
+      } else if (m.role === 'tool') {
+        console.log(`[Copilot Gemini Proxy] ${requestId}   [tool response] id=${m.tool_call_id} content=${m.content.substring(0, 200)}`);
+      }
+    }
+    
+    if (isStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      
+      const nimStream = await chatStream(messages, nimOptions);
+      const reader = nimStream.getReader ? nimStream.getReader() : null;
+      
+      // We accumulate tool call arguments across chunks if it streams them
+      let currentToolCall = null;
+      let hasEmittedReasoningHeader = false;
+      let hasEmittedReasoningFooter = false;
+
+      const processOpenAIChunk = (data) => {
+        if (data === '[DONE]') {
+           if (currentToolCall) {
+              let argsObj = {};
+              try { argsObj = JSON.parse(currentToolCall.args || "{}"); } catch(e) {}
+              res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{functionCall:{name:currentToolCall.name,args:argsObj}}],role:"model"}}]})}\n\n`);
+              currentToolCall = null;
+           }
+           res.write(`data: ${JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:""}],role:"model"}}],usageMetadata:{}})}\n\n`);
+           return;
+        }
+        try {
+          const parsed = JSON.parse(data);
+          let textChunk = parsed.choices?.[0]?.delta?.content || '';
+          const toolCalls = parsed.choices?.[0]?.delta?.tool_calls;
+          const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning_content || '';
+          
+          if (toolCalls && toolCalls.length > 0) {
+             const t = toolCalls[0].function;
+             if (t) {
+               if (t.name) {
+                 // Start of a tool call
+                 currentToolCall = { name: t.name, args: t.arguments || '' };
+               } else if (t.arguments && currentToolCall) {
+                 // Continuation of arguments
+                 currentToolCall.args += t.arguments;
+               }
+             }
+             return;
+          }
+          
+          // If we had a tool call streaming, and now we get text or finish, emit the tool call!
+          if (!toolCalls && currentToolCall) {
+             let argsObj = {};
+             try { argsObj = JSON.parse(currentToolCall.args || "{}"); } catch(e) {}
+             res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{functionCall:{name:currentToolCall.name,args:argsObj}}],role:"model"}}]})}\n\n`);
+             currentToolCall = null;
+          }
+
+          if (reasoningChunk && !textChunk) {
+            return;
+          }
+
+          if (false && reasoningChunk) {
+            if (!hasEmittedReasoningHeader) {
+              res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{text:"--- \n**🧠 Quá trình suy luận:**\n\n" + reasoningChunk}],role:"model"}}]})}\n\n`);
+              hasEmittedReasoningHeader = true;
+            } else {
+              res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{text:reasoningChunk}],role:"model"}}]})}\n\n`);
+            }
+            return;
+          }
+          
+          if (textChunk) {
+            res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{text:textChunk}],role:"model"}}]})}\n\n`);
+          }
+        } catch (e) {}
+      };
+
+      if (reader) {
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              processOpenAIChunk(line.slice(6).trim());
+            }
+          }
+        }
+        // flush any pending tool call
+        if (currentToolCall) {
+           let argsObj = {};
+           try { argsObj = JSON.parse(currentToolCall.args || "{}"); } catch(e) {}
+           res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{functionCall:{name:currentToolCall.name,args:argsObj}}],role:"model"}}]})}\n\n`);
+           currentToolCall = null;
+        }
+      } else {
+        for await (const chunk of nimStream) {
+          const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString();
+          const lines = text.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              processOpenAIChunk(line.slice(6).trim());
+            }
+          }
+        }
+        if (currentToolCall) {
+           let argsObj = {};
+           try { argsObj = JSON.parse(currentToolCall.args || "{}"); } catch(e) {}
+           res.write(`data: ${JSON.stringify({candidates:[{content:{parts:[{functionCall:{name:currentToolCall.name,args:argsObj}}],role:"model"}}]})}\n\n`);
+           currentToolCall = null;
+        }
+      }
+      res.end();
+    } else {
+      const content = await chatComplete(messages, nimOptions);
+      res.json({
+        candidates: [{
+          content: { parts: [{ text: content }], role: 'model' },
+          finishReason: 'STOP'
+        }]
+      });
+    }
+  } catch (err) {
+    console.error('[Copilot Gemini Proxy] Error:', err.message);
+    res.status(500).json({ error: { message: err.message } });
   }
 });
 

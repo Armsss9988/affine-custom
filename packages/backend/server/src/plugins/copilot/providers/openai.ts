@@ -66,7 +66,12 @@ export class OpenAIProvider extends CopilotProvider<OpenAIConfig> {
     execution?: CopilotProviderExecution
   ): LlmBackendConfig {
     const config = this.getConfig(execution);
-    const baseUrl = config.baseURL || 'https://api.openai.com/v1';
+    let baseUrl = config.baseURL || 'https://api.openai.com/v1';
+    if (process.env.NODE_ENV !== 'production') {
+      baseUrl = baseUrl
+        .replace('affine_chatbot', 'localhost')
+        .replace('://chatbot:', '://localhost:');
+    }
     return {
       base_url: baseUrl.replace(/\/v1\/?$/, ''),
       auth_token: config.apiKey,

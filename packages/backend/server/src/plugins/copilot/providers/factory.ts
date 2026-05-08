@@ -73,7 +73,7 @@ export class CopilotProviderFactory {
     private readonly server: ServerService,
     private readonly registries: CopilotProviderRegistryService,
     private readonly access: CopilotAccessPolicy
-  ) {}
+  ) { }
 
   private readonly logger = new Logger(CopilotProviderFactory.name);
 
@@ -215,10 +215,10 @@ export class CopilotProviderFactory {
       ? byokRoutes
       : quotaBackedRoutesAvailable
         ? await this.resolveRoutesFromRegistry(
-            quotaBackedRegistry,
-            cond,
-            filter
-          )
+          quotaBackedRegistry,
+          cond,
+          filter
+        )
         : [];
     for (const route of resolved) {
       this.logger.debug(

@@ -10,6 +10,7 @@ import { CopilotContextService } from '../context/service';
 import {
   type CopilotChatOptions,
   type CopilotChatTools,
+  type PromptMessage,
 } from '../providers/types';
 import {
   buildBlobContentGetter,
@@ -34,6 +35,7 @@ import {
   createExaCrawlTool,
   createExaSearchTool,
   createSectionEditTool,
+  getConfiguredExaKey,
 } from '../tools';
 import { PromptRuntime } from './prompt-runtime';
 import type { ToolLoopBackend } from './tool/bridge';
@@ -66,11 +68,25 @@ export class ToolRuntime {
     if (!options?.tools?.length) {
       return tools;
     }
+
+    let syncedWorkspaceAvailable: Promise<boolean> | undefined;
+    const canUseSyncedWorkspaceTools = async () => {
+      if (!options.workspace) {
+        return true;
+      }
+      syncedWorkspaceAvailable ??= this.models.workspace
+        .get(options.workspace)
+        .then(Boolean);
+      return await syncedWorkspaceAvailable;
+    };
+
     const runPromptText = (
       promptName: string,
-      params: Record<string, unknown>
+      params: Record<string, unknown>,
+      promptOptions?: { appendMessages?: PromptMessage[] }
     ) =>
       this.promptRuntime.runText(promptName, params, {
+        appendMessages: promptOptions?.appendMessages,
         providerOptions: {
           user: options.user,
           session: options.session,
@@ -121,6 +137,9 @@ export class ToolRuntime {
           break;
         }
         case 'docSemanticSearch': {
+          if (!(await canUseSyncedWorkspaceTools())) {
+            break;
+          }
           const searchDocs = buildDocSearchGetter(
             this.ac,
             this.context,
@@ -133,7 +152,10 @@ export class ToolRuntime {
           break;
         }
         case 'docKeywordSearch': {
-          if (this.config.indexer.enabled) {
+          if (
+            this.config.indexer.enabled &&
+            (await canUseSyncedWorkspaceTools())
+          ) {
             const searchDocs = buildDocKeywordSearchGetter(
               this.ac,
               this.indexerService,
@@ -146,6 +168,9 @@ export class ToolRuntime {
           break;
         }
         case 'docRead': {
+          if (!(await canUseSyncedWorkspaceTools())) {
+            break;
+          }
           const getDoc = buildDocContentGetter(
             this.ac,
             this.docReader,
@@ -175,8 +200,10 @@ export class ToolRuntime {
           break;
         }
         case 'webSearch': {
-          tools.web_search_exa = createExaSearchTool(this.config);
-          tools.web_crawl_exa = createExaCrawlTool(this.config);
+          if (getConfiguredExaKey(this.config)) {
+            tools.web_search_exa = createExaSearchTool(this.config);
+            tools.web_crawl_exa = createExaCrawlTool(this.config);
+          }
           break;
         }
         case 'docCompose': {

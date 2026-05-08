@@ -18,10 +18,14 @@ export class GeminiGenerativeProvider extends GeminiProvider<GeminiGenerativeCon
     execution?: CopilotProviderExecution
   ): Promise<LlmBackendConfig> {
     const config = this.getConfig(execution);
+    let baseUrl = config.baseURL || 'https://generativelanguage.googleapis.com/v1beta';
+    if (process.env.NODE_ENV !== 'production') {
+      baseUrl = baseUrl
+        .replace('affine_chatbot', 'localhost')
+        .replace('://chatbot:', '://localhost:');
+    }
     return {
-      base_url: (
-        config.baseURL || 'https://generativelanguage.googleapis.com/v1beta'
-      ).replace(/\/$/, ''),
+      base_url: baseUrl.replace(/\/$/, ''),
       auth_token: config.apiKey,
     };
   }

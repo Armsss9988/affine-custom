@@ -9,6 +9,10 @@
       "openai": {
         "apiKey": "nim-proxy-key",
         "baseURL": "http://chatbot:3099/v1"
+      },
+      "gemini": {
+        "apiKey": "nim-proxy-key",
+        "baseURL": "http://chatbot:3099/v1beta"
       }
     },
     "scenarios": {
@@ -25,7 +29,9 @@
         "quick_text_generation": "gpt-4o",
         "polish_and_summarize": "gpt-4o"
       }
+    },
+    "exa": {
+      "key": "17de1a5d-d445-4897-9af9-0c6d3684bdea"
     }
   }
 }
-

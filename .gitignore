@@ -49,6 +49,11 @@ testem.log
 tsconfig.tsbuildinfo
 .context
 /*.md
+!CLAUDE.md
+
+# Claude Code config (allow shared settings, ignore local)
+/.claude/settings.local.json
+!.claude/settings.json
 
 # System Files
 .DS_Store

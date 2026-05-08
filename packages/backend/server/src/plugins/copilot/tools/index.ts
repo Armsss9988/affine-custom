@@ -7,6 +7,7 @@ export * from './doc-read';
 export * from './doc-semantic-search';
 export * from './doc-write';
 export * from './error';
+export * from './exa-config';
 export * from './exa-crawl';
 export * from './exa-search';
 export * from './section-edit';

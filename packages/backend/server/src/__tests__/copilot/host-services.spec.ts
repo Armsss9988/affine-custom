@@ -408,6 +408,125 @@ test('ToolRuntime should pass route context into prompt-backed tools', async t =
   );
 });
 
+test('ToolRuntime should pass doc compose prompt into article generation', async t => {
+  const promptRuntime = {
+    runText: Sinon.stub().resolves('generated article'),
+  };
+  const runtime = new ToolRuntime(
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    promptRuntime as any,
+    {} as any
+  );
+
+  const tools = await runtime.getTools(
+    {
+      tools: ['docCompose'],
+      user: 'user-1',
+      session: 'session-1',
+      workspace: 'workspace-1',
+      featureKind: 'chat',
+    },
+    'gpt-4o-mini'
+  );
+
+  const result = await tools.doc_compose.execute?.(
+    {
+      title: 'Gantz - Tổng Quan',
+      userPrompt: 'Viết tổng quan về manga Gantz.',
+    },
+    {}
+  );
+
+  t.like(result as object, { title: 'Gantz - Tổng Quan' });
+  Sinon.assert.calledOnceWithMatch(
+    promptRuntime.runText,
+    'Write an article about this',
+    {},
+    {
+      appendMessages: [
+        { role: 'user', content: 'Viết tổng quan về manga Gantz.' },
+      ],
+      providerOptions: {
+        user: 'user-1',
+        session: 'session-1',
+        workspace: 'workspace-1',
+        featureKind: 'chat',
+      },
+    }
+  );
+});
+
+test('ToolRuntime should skip document lookup tools for local-only workspaces', async t => {
+  const runtime = new ToolRuntime(
+    {
+      copilot: { exa: { key: '' } },
+      indexer: { enabled: true },
+    } as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {
+      workspace: {
+        get: Sinon.stub().resolves(null),
+      },
+    } as any,
+    {
+      runText: Sinon.stub().resolves('ok'),
+    } as any,
+    {} as any
+  );
+
+  const tools = await runtime.getTools(
+    {
+      tools: ['docKeywordSearch', 'docSemanticSearch', 'docRead', 'docCompose'],
+      user: 'user-1',
+      workspace: 'workspace-1',
+    },
+    'gpt-4o-mini'
+  );
+
+  t.false('doc_keyword_search' in tools);
+  t.false('doc_semantic_search' in tools);
+  t.false('doc_read' in tools);
+  t.true('doc_compose' in tools);
+});
+
+for (const exaKey of ['', 'YOUR_EXA_API_KEY']) {
+  test(`ToolRuntime should skip Exa web tools when key is ${exaKey || 'empty'}`, async t => {
+    const runtime = new ToolRuntime(
+      {
+        copilot: { exa: { key: exaKey } },
+        indexer: { enabled: false },
+      } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+
+    const tools = await runtime.getTools(
+      {
+        tools: ['webSearch'],
+        user: 'user-1',
+        workspace: 'workspace-1',
+      },
+      'gpt-4o-mini'
+    );
+
+    t.false('web_search_exa' in tools);
+    t.false('web_crawl_exa' in tools);
+  });
+}
+
 test('ResponsePostprocessor should build text, object and image assistant turns', t => {
   const postprocessor = new ResponsePostprocessor();
 

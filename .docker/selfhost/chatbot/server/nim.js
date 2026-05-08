@@ -4,7 +4,7 @@ const LLM_MODEL = process.env.NIM_LLM_MODEL || 'stepfun-ai/step-3.5-flash';
 
 const EMBEDDING_BASE_URL = process.env.EMBEDDING_BASE_URL || 'https://integrate.api.nvidia.com/v1';
 const EMBEDDING_API_KEY = process.env.EMBEDDING_API_KEY || process.env.NIM_API_KEY || '';
-const EMBEDDING_MODEL = process.env.NIM_EMBEDDING_MODEL || 'nvidia/llama-3.2-nv-embed-qa-4';
+const EMBEDDING_MODEL = process.env.NIM_EMBEDDING_MODEL || 'nvidia/nv-embedqa-e5-v5';
 
 /**
  * Generate text embedding using NIM API
@@ -43,9 +43,18 @@ async function embedText(text) {
  * @returns {ReadableStream} SSE stream
  */
 async function chatStream(messages, options = {}) {
+  const collapsedMessages = [];
+  for (const m of messages) {
+    if (collapsedMessages.length > 0 && collapsedMessages[collapsedMessages.length - 1].role === m.role) {
+      collapsedMessages[collapsedMessages.length - 1].content += '\n\n' + m.content;
+    } else {
+      collapsedMessages.push({ role: m.role, content: m.content });
+    }
+  }
+
   const body = {
     model: LLM_MODEL,
-    messages,
+    messages: collapsedMessages,
     stream: true,
     temperature: options.temperature ?? 0.3,
     max_tokens: options.max_tokens ?? 2048,
@@ -78,9 +87,18 @@ async function chatStream(messages, options = {}) {
  * @returns {Promise<string>}
  */
 async function chatComplete(messages, options = {}) {
+  const collapsedMessages = [];
+  for (const m of messages) {
+    if (collapsedMessages.length > 0 && collapsedMessages[collapsedMessages.length - 1].role === m.role) {
+      collapsedMessages[collapsedMessages.length - 1].content += '\n\n' + m.content;
+    } else {
+      collapsedMessages.push({ role: m.role, content: m.content });
+    }
+  }
+
   const body = {
     model: LLM_MODEL,
-    messages,
+    messages: collapsedMessages,
     stream: false,
     temperature: options.temperature ?? 0.2,
     max_tokens: options.max_tokens ?? 4096,

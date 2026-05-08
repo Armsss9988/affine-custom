@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-bookworm-slim AS build
+WORKDIR /workspace
+
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    make \
+    g++ \
+    openssl \
+    pkg-config \
+    python3 && \
+  rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+RUN corepack enable
+RUN yarn install --immutable --inline-builds
+RUN yarn affine bundle -p @affine/server
+
+FROM ghcr.io/armsss9988/affine-custom:stable-custom
+
+COPY --from=build /workspace/packages/backend/server/dist/main.js /app/dist/main.js
+COPY --from=build /workspace/packages/backend/server/dist/main.js.map /app/dist/main.js.map
+COPY --from=build /workspace/packages/backend/server/src /app/src
