@@ -263,6 +263,10 @@ jobs:
         with:
           app-version: ${{ inputs.app-version }}
 
+      - name: Set lower case repository name
+        run: |
+          echo "REPO=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
       - name: Build backend Dockerfile
         uses: docker/build-push-action@v6
         with:
@@ -272,4 +276,4 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           provenance: true
           file: .github/deployment/node/Dockerfile
-          tags: ghcr.io/toeverything/affine:${{inputs.build-type}}-${{ inputs.git-short-hash }}
+          tags: ghcr.io/${{ env.REPO }}:${{inputs.build-type}}-${{ inputs.git-short-hash }}
