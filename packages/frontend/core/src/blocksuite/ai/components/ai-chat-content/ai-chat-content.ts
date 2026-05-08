@@ -65,7 +65,7 @@ export class AIChatContent extends SignalWatcher(
     ai-chat-content {
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       height: 100%;
 
       ai-chat-messages {
@@ -93,7 +93,7 @@ export class AIChatContent extends SignalWatcher(
       --h-padding: 8px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       height: 100%;
       width: 100%;
       padding: 8px calc(24px - var(--h-padding)) 0 calc(24px - var(--h-padding));

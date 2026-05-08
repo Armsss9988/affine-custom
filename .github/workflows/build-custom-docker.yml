@@ -1,0 +1,32 @@
+name: Build Custom Image Manually
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-type:
+        description: 'Build Type (e.g. stable, canary)'
+        default: 'stable'
+        required: true
+      app-version:
+        description: 'App Version'
+        default: '0.26.3'
+        required: true
+      git-short-hash:
+        description: 'Image Tag Suffix (e.g. custom)'
+        default: 'custom'
+        required: true
+
+permissions:
+  contents: 'write'
+  id-token: 'write'
+  packages: 'write'
+
+jobs:
+  build-custom-image:
+    name: Trigger Build Images
+    uses: ./.github/workflows/build-images.yml
+    secrets: inherit
+    with:
+      build-type: ${{ inputs.build-type }}
+      app-version: ${{ inputs.app-version }}
+      git-short-hash: ${{ inputs.git-short-hash }}

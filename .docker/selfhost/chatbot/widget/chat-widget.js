@@ -212,9 +212,9 @@
               if (data === '[DONE]') return;
               try {
                 const parsed = JSON.parse(data);
-                const choices = parsed.choices;
-                if (choices && choices[0] && choices[0].delta && choices[0].delta.content) {
-                  fullText += choices[0].delta.content;
+                const content = parsed.content !== undefined ? parsed.content : (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content);
+                if (content) {
+                  fullText += content;
                   bubbleEl.innerHTML = renderMarkdown(fullText);
                   scrollToBottom();
                 }

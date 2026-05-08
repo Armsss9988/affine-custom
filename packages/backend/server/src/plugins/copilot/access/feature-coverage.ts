@@ -16,13 +16,13 @@ const DEFAULT_BYOK_COVERAGE: ByokSourceCoverage = {
 
 const DEFAULT_FEATURE_ACCESS: CopilotFeatureAccessRule = {
   ...DEFAULT_BYOK_COVERAGE,
-  quotaMetered: true,
+  quotaMetered: false,
 };
 
 const COPILOT_FEATURE_ACCESS: Partial<
   Record<ByokFeatureKind, CopilotFeatureAccessRule>
 > = {
-  transcript: { local: false, server: true, quotaMetered: true },
+  transcript: { local: false, server: true, quotaMetered: false },
   embedding: { local: false, server: true, quotaMetered: false },
   workspace_indexing: { local: false, server: true, quotaMetered: false },
   rerank: { local: false, server: true, quotaMetered: false },

@@ -21,6 +21,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'affine-chatbot', timestamp: new Date().toISOString() });
 });
 
+// OpenAI Compatible Endpoints (for AFFiNE Copilot via OpenAI provider)
+const copilotRouter = require('./copilot');
+app.use('/v1', copilotRouter);
+
+// Gemini-path Endpoints (for AFFiNE Copilot via Gemini provider)
+// AFFiNE's @ai-sdk/google uses /v1beta as its base URL — we reuse the same
+// copilot router since all requests get remapped to NIM anyway.
+app.use('/v1beta', copilotRouter);
+
 // Chat endpoint (streaming via SSE)
 app.post('/api/chat', async (req, res) => {
   const { message, sessionId, userId, teamId } = req.body;

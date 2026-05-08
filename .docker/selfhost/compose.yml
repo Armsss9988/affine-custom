@@ -13,6 +13,8 @@ services:
         condition: service_healthy
       affine_migration:
         condition: service_completed_successfully
+      chatbot:
+        condition: service_started
     volumes:
       # custom configurations
       - ${UPLOAD_LOCATION}:/root/.affine/storage
@@ -38,14 +40,20 @@ services:
       - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
       - NIM_API_KEY=${NIM_API_KEY}
       - NIM_BASE_URL=${NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
-      - NIM_LLM_MODEL=${NIM_LLM_MODEL:-meta/llama-3.1-70b-instruct}
-      - NIM_EMBEDDING_MODEL=${NIM_EMBEDDING_MODEL:-nvidia/nv-embedqa-e5-v5}
+      - NIM_LLM_MODEL=${NIM_LLM_MODEL:-stepfun-ai/step-3.5-flash}
+      - NIM_EMBEDDING_MODEL=${NIM_EMBEDDING_MODEL:-nvidia/llama-3.2-nv-embed-qa-4}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - CHATBOT_PORT=3099
     volumes:
-      - ./chatbot/knowledge:/app/knowledge
+      - ./chatbot:/app
+      - /app/node_modules
+    command: ["node", "--watch", "server/index.js"]
     depends_on:
       postgres:
         condition: service_healthy
+      affine_migration:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   nginx:

@@ -40,6 +40,8 @@ import {
 export class AIChatMessages extends WithDisposable(ShadowlessElement) {
   static override styles = css`
     ai-chat-messages {
+      display: flex;
+      flex-direction: column;
       position: relative;
     }
 

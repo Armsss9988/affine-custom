@@ -63,6 +63,8 @@ export class ArtifactPreviewPanel extends WithDisposable(ShadowlessElement) {
       box-shadow: ${unsafeCSSVar('overlayPanelShadow')};
       height: 100%;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .artifact-panel-header {
@@ -71,6 +73,7 @@ export class ArtifactPreviewPanel extends WithDisposable(ShadowlessElement) {
       justify-content: flex-end;
       padding: 0 12px;
       height: 52px;
+      flex-shrink: 0;
       background: ${unsafeCSSVarV2('layer/background/overlayPanel')};
     }
 
@@ -103,7 +106,8 @@ export class ArtifactPreviewPanel extends WithDisposable(ShadowlessElement) {
 
     .artifact-panel-content {
       overflow-y: auto;
-      height: calc(100% - 52px);
+      flex: 1;
+      height: 0;
       position: relative;
     }
 

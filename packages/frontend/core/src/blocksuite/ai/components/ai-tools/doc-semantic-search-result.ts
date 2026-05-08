@@ -82,7 +82,7 @@ export class DocSemanticSearchResult extends WithDisposable(ShadowlessElement) {
       return nothing;
     }
     const result = this.data.result;
-    if (!result || isToolError(result)) {
+    if (!result || isToolError(result) || !Array.isArray(result)) {
       return html`<tool-call-failed
         .name=${getToolErrorDisplayName(
           isToolError(result) ? result : null,
