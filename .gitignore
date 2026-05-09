@@ -55,6 +55,9 @@ tsconfig.tsbuildinfo
 /.claude/settings.local.json
 !.claude/settings.json
 
+# Allow superpowers design specs (overrides global ignore)
+!docs/superpowers/
+
 # System Files
 .DS_Store
 Thumbs.db
