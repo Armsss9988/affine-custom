@@ -11,7 +11,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 export interface ErrorState {
   visible: boolean;
-  mode: 'compact' | 'expanded' | 'debug';
+  mode: 'hidden' | 'compact' | 'expanded' | 'debug';
   message: string;
   stack?: string;
   rendererUsed?: 'classic' | 'wasm';
@@ -250,7 +250,7 @@ export class MermaidPreview extends SignalWatcher(
   @state()
   accessor errorState: ErrorState = {
     visible: false,
-    mode: 'compact',
+    mode: 'hidden',
     message: '',
   };
 
@@ -259,23 +259,37 @@ export class MermaidPreview extends SignalWatcher(
   private lastRendererUsed?: 'classic' | 'wasm';
 
   private readonly _toggleErrorMode = () => {
-    const modes: Array<'compact' | 'expanded' | 'debug'> = [
+    // Cycle: hidden → compact → expanded → debug → hidden
+    const modes: Array<'hidden' | 'compact' | 'expanded' | 'debug'> = [
+      'hidden',
       'compact',
       'expanded',
       'debug',
     ];
     const currentIndex = modes.indexOf(this.errorState.mode);
     const nextIndex = (currentIndex + 1) % modes.length;
-    this.errorState = {
-      ...this.errorState,
-      mode: modes[nextIndex],
-      visible: true,
-    };
+
+    // If wrapping from debug back to hidden, dismiss the error
+    if (nextIndex === 0) {
+      this.errorState = {
+        ...this.errorState,
+        mode: 'hidden',
+        visible: false,
+      };
+    } else {
+      // Show the error in the next visible mode (compact, expanded, or debug)
+      this.errorState = {
+        ...this.errorState,
+        mode: modes[nextIndex],
+        visible: true,
+      };
+    }
   };
 
   private readonly _hideError = () => {
     this.errorState = {
       ...this.errorState,
+      mode: 'hidden',
       visible: false,
     };
   };
