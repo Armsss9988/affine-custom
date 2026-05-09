@@ -12,10 +12,11 @@ import type {
 } from '@affine/core/modules/typst/renderer';
 import DOMPurify from 'dompurify';
 
-function removeForeignObject(root: ParentNode) {
-  root
-    .querySelectorAll('foreignObject, foreignobject')
-    .forEach(element => element.remove());
+function removeForeignObject(root: ParentNode): number {
+  const elements = root.querySelectorAll('foreignObject, foreignobject');
+  const count = elements.length;
+  elements.forEach(element => element.remove());
+  return count;
 }
 
 export function sanitizeSvg(svg: string): string {
@@ -43,7 +44,20 @@ export function sanitizeSvg(svg: string): string {
   if (!sanitizedRoot || sanitizedRoot.tagName.toLowerCase() !== 'svg')
     return '';
 
-  removeForeignObject(sanitizedRoot);
+  // Log foreignObject removal for debugging
+  const foreignObjectRemoved = removeForeignObject(sanitizedRoot);
+  if (foreignObjectRemoved > 0) {
+    console.debug(
+      `[Mermaid Sanitization] Removed ${foreignObjectRemoved} foreignObject element(s)`
+    );
+  }
+
+  // Log text elements count
+  const textElements = sanitizedRoot.querySelectorAll('text, tspan');
+  console.debug(
+    `[Mermaid Sanitization] Found ${textElements.length} text element(s)`
+  );
+
   return new XMLSerializer().serializeToString(sanitizedRoot).trim();
 }
 
