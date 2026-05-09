@@ -9,6 +9,20 @@ import { property, query, state } from 'lit/decorators.js';
 import { choose } from 'lit/directives/choose.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+export interface ErrorState {
+  visible: boolean;
+  mode: 'compact' | 'expanded' | 'debug';
+  message: string;
+  stack?: string;
+  rendererUsed?: 'classic' | 'wasm';
+  svgOutput?: string;
+}
+
+interface RenderResult {
+  svg: string;
+  rendererUsed?: 'classic' | 'wasm';
+}
+
 export const CodeBlockMermaidPreview = CodeBlockPreviewExtension(
   'mermaid',
   model => html`<mermaid-preview .model=${model}></mermaid-preview>`
@@ -136,6 +150,72 @@ export class MermaidPreview extends SignalWatcher(
       color: ${unsafeCSSVarV2('text/secondary')};
       z-index: 10;
     }
+
+    .mermaid-error-controls {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+      z-index: 10;
+    }
+
+    .mermaid-error-message {
+      color: ${unsafeCSSVarV2('button/error')};
+      font-family: 'IBM Plex Mono';
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 400;
+      line-height: normal;
+    }
+
+    .mermaid-error-details {
+      margin-top: 12px;
+      padding: 12px;
+      background: ${unsafeCSSVarV2('layer/background/overlayPanel')};
+      border: 1px solid ${unsafeCSSVarV2('layer/insideBorder/border')};
+      border-radius: 4px;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .mermaid-error-details pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: ${unsafeCSSVarV2('text/secondary')};
+    }
+
+    .mermaid-error-label {
+      font-weight: 600;
+      color: ${unsafeCSSVarV2('text/primary')};
+      margin-bottom: 4px;
+    }
+
+    .mermaid-error-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: ${unsafeCSSVarV2('button/error')};
+      color: white;
+      border-radius: 4px;
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+
+    .mermaid-copy-tooltip {
+      background: ${unsafeCSSVarV2('layer/background/overlayPanel')};
+      color: ${unsafeCSSVarV2('text/primary')};
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      z-index: 20;
+    }
   `;
 
   @property({ attribute: false })
@@ -166,6 +246,60 @@ export class MermaidPreview extends SignalWatcher(
   private lastMouseX = 0;
   private lastMouseY = 0;
 
+  // error state
+  @state()
+  accessor errorState: ErrorState = {
+    visible: false,
+    mode: 'compact',
+    message: '',
+  };
+
+  private copyTooltipTimeout: ReturnType<typeof setTimeout> | null = null;
+  private showCopyTooltip = false;
+  private lastRendererUsed?: 'classic' | 'wasm';
+
+  private readonly _toggleErrorMode = () => {
+    const modes: Array<'compact' | 'expanded' | 'debug'> = [
+      'compact',
+      'expanded',
+      'debug',
+    ];
+    const currentIndex = modes.indexOf(this.errorState.mode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    this.errorState = {
+      ...this.errorState,
+      mode: modes[nextIndex],
+      visible: true,
+    };
+  };
+
+  private readonly _hideError = () => {
+    this.errorState = {
+      ...this.errorState,
+      visible: false,
+    };
+  };
+
+  private readonly _copyErrorToClipboard = async () => {
+    const text =
+      this.errorState.stack
+        ? `${this.errorState.message}\n\nStack:\n${this.errorState.stack}`
+        : this.errorState.message;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      this.showCopyTooltip = true;
+      if (this.copyTooltipTimeout) {
+        clearTimeout(this.copyTooltipTimeout);
+      }
+      this.copyTooltipTimeout = setTimeout(() => {
+        this.showCopyTooltip = false;
+      }, 1500);
+    } catch (err) {
+      console.error('Failed to copy error:', err);
+    }
+  };
+
   override firstUpdated(_changedProperties: PropertyValues): void {
     this._scheduleRender();
     this._setupEventListeners();
@@ -191,6 +325,10 @@ export class MermaidPreview extends SignalWatcher(
     if (this.renderTimeout) {
       clearTimeout(this.renderTimeout);
       this.renderTimeout = null;
+    }
+    if (this.copyTooltipTimeout) {
+      clearTimeout(this.copyTooltipTimeout);
+      this.copyTooltipTimeout = null;
     }
   }
 
@@ -324,7 +462,7 @@ export class MermaidPreview extends SignalWatcher(
     }
 
     try {
-      const { svg } = await renderMermaidSvg({
+      const result: RenderResult = await renderMermaidSvg({
         code,
         options: {
           fastText: true,
@@ -335,7 +473,9 @@ export class MermaidPreview extends SignalWatcher(
       });
 
       // update SVG content
-      this.svgContent = svg;
+      this.svgContent = result.svg;
+      // store renderer used for debug info
+      this.lastRendererUsed = result.rendererUsed;
       this.state = 'finish';
       this.retryCount = 0; // reset retry count
 
@@ -358,6 +498,15 @@ export class MermaidPreview extends SignalWatcher(
         return;
       }
 
+      // capture error details
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.errorState = {
+        visible: true,
+        mode: 'compact',
+        message: err.message || 'Failed to render diagram',
+        stack: err.stack,
+        rendererUsed: this.lastRendererUsed,
+      };
       this.state = 'error';
       this.retryCount = 0; // reset retry count
     } finally {
@@ -383,15 +532,67 @@ export class MermaidPreview extends SignalWatcher(
           ],
           [
             'error',
-            () =>
-              html`<div class="mermaid-preview-error">
+            () => html`<div class="mermaid-preview-error" style="position: relative; width: 100%; height: 100%;">
                 <div style="text-align: center; padding: 20px;">
                   <div style="margin-bottom: 8px;">
                     Failed to render diagram
                   </div>
-                  <div style="font-size: 10px; opacity: 0.6;">
-                    Please check if your Mermaid code has syntax errors
-                  </div>
+                  ${this.errorState.mode === 'compact'
+                    ? html`<div style="font-size: 10px; opacity: 0.6;">
+                        Click the ⚠️ button to see error details
+                      </div>`
+                    : nothing}
+                  ${this.errorState.mode === 'expanded' ||
+                  this.errorState.mode === 'debug'
+                    ? html`<div style="margin-top: 12px; font-size: 11px; color: ${unsafeCSSVarV2('text/secondary')};">
+                        <strong>Error:</strong> ${this.errorState.message}
+                      </div>`
+                    : nothing}
+                  ${this.errorState.mode === 'debug'
+                    ? html`<div
+                        class="mermaid-error-details"
+                        style="text-align: left; margin-top: 12px;"
+                      >
+                        <div class="mermaid-error-badge">
+                          Renderer: ${this.errorState.rendererUsed ?? 'unknown'}
+                        </div>
+                        ${this.errorState.stack
+                          ? html`<div style="margin-top: 8px;">
+                              <div class="mermaid-error-label">Stack trace:</div>
+                              <pre>${this.errorState.stack}</pre>
+                            </div>`
+                          : nothing}
+                      </div>`
+                    : nothing}
+                </div>
+                <div class="mermaid-error-controls">
+                  <button
+                    class="mermaid-control-button"
+                    @click=${this._copyErrorToClipboard}
+                    title="Copy error details"
+                    style="position: relative;"
+                  >
+                    ${this.showCopyTooltip
+                      ? html`<span class="mermaid-copy-tooltip">Copied!</span>`
+                      : nothing}
+                    📋
+                  </button>
+                  <button
+                    class="mermaid-control-button"
+                    @click=${this._toggleErrorMode}
+                    title="Toggle error details (${this.errorState.mode})"
+                  >
+                    ⚠️
+                  </button>
+                  ${this.errorState.visible
+                    ? html`<button
+                        class="mermaid-control-button"
+                        @click=${this._hideError}
+                        title="Hide error details"
+                      >
+                        ×
+                      </button>`
+                    : nothing}
                 </div>
               </div>`,
           ],
