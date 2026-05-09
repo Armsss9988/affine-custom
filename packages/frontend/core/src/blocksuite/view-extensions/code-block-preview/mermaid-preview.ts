@@ -1,3 +1,8 @@
+import {
+  getMermaidRendererMode,
+  setMermaidRendererMode,
+  type MermaidRendererMode,
+} from '@affine/core/modules/code-block-preview-renderer/runtime-config';
 import { renderMermaidSvg } from '@affine/core/modules/code-block-preview-renderer/bridge';
 import { CodeBlockPreviewExtension } from '@blocksuite/affine/blocks/code';
 import { SignalWatcher, WithDisposable } from '@blocksuite/affine/global/lit';
@@ -216,6 +221,50 @@ export class MermaidPreview extends SignalWatcher(
       white-space: nowrap;
       z-index: 20;
     }
+
+    .mermaid-renderer-selector {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .mermaid-renderer-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      background: ${unsafeCSSVarV2('text/primary')};
+      color: ${unsafeCSSVarV2('layer/background/primary')};
+    }
+
+    .mermaid-renderer-badge.classic {
+      background: #f97316;
+      color: white;
+    }
+
+    .mermaid-renderer-badge.wasm {
+      background: #22c55e;
+      color: white;
+    }
+
+    .mermaid-renderer-select {
+      border: 1px solid ${unsafeCSSVarV2('layer/insideBorder/border')};
+      border-radius: 4px;
+      background: ${unsafeCSSVarV2('layer/background/primary')};
+      color: ${unsafeCSSVarV2('text/primary')};
+      font-size: 11px;
+      padding: 4px 8px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .mermaid-renderer-select:hover {
+      border-color: ${unsafeCSSVarV2('layer/insideBorder/primaryBorder')};
+    }
   `;
 
   @property({ attribute: false })
@@ -253,6 +302,10 @@ export class MermaidPreview extends SignalWatcher(
     mode: 'hidden',
     message: '',
   };
+
+  // renderer mode selection
+  @state()
+  accessor rendererMode: MermaidRendererMode = getMermaidRendererMode();
 
   private copyTooltipTimeout: ReturnType<typeof setTimeout> | null = null;
   private showCopyTooltip = false;
@@ -313,6 +366,28 @@ export class MermaidPreview extends SignalWatcher(
       console.error('Failed to copy error:', err);
     }
   };
+
+  private readonly _setRendererMode = (e: Event) => {
+    const select = e.target as HTMLSelectElement;
+    const mode = select.value as MermaidRendererMode;
+    setMermaidRendererMode(mode);
+    this.rendererMode = mode;
+    // Re-trigger render with new mode
+    this._scheduleRender();
+  };
+
+  get _rendererLabel(): string {
+    switch (this.rendererMode) {
+      case 'auto':
+        return 'Auto';
+      case 'classic':
+        return 'Classic';
+      case 'wasm':
+        return 'WASM';
+      default:
+        return 'Auto';
+    }
+  }
 
   override firstUpdated(_changedProperties: PropertyValues): void {
     this._scheduleRender();
@@ -666,6 +741,24 @@ export class MermaidPreview extends SignalWatcher(
                 </div>
                 <div class="mermaid-scale-info">
                   ${Math.round(this.scale * 100)}%
+                </div>
+                <div class="mermaid-renderer-selector">
+                  <span
+                    class="mermaid-renderer-badge ${this.rendererMode}"
+                    title="Current renderer"
+                  >
+                    ${this._rendererLabel}
+                  </span>
+                  <select
+                    class="mermaid-renderer-select"
+                    .value=${this.rendererMode}
+                    @change=${this._setRendererMode}
+                    title="Select renderer mode"
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="classic">Classic JS</option>
+                    <option value="wasm">WASM Rust</option>
+                  </select>
                 </div>
               `
             : nothing}

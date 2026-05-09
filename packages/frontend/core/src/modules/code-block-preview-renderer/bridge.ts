@@ -56,7 +56,7 @@ export async function renderMermaidSvg(
   if (!sanitizedSvg) {
     throw new Error('Preview renderer returned invalid SVG.');
   }
-  return { svg: sanitizedSvg };
+  return { svg: sanitizedSvg, rendererUsed: rendered.rendererUsed };
 }
 
 export async function renderTypstSvg(
