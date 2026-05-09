@@ -24,6 +24,8 @@ export type MermaidRenderRequest = {
 
 export type MermaidRenderResult = {
   svg: string;
+  /** Which renderer was used: 'classic' or 'wasm' */
+  rendererUsed?: 'classic' | 'wasm';
 };
 
 export interface MermaidOps extends OpSchema {

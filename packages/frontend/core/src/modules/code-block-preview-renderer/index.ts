@@ -7,7 +7,11 @@ export { renderMermaidSvg, renderTypstSvg, sanitizeSvg } from './bridge';
 export {
   registerNativePreviewHandlers,
   setMermaidWasmNativeRendererEnabled,
+  setMermaidRendererMode,
+  getMermaidRendererMode,
+  isMermaidWasmNativeRendererEnabled,
 } from './runtime-config';
+export type { MermaidRendererMode } from './runtime-config';
 
 export function configureCodeBlockPreviewRendererModule(framework: Framework) {
   framework.service(PreviewRendererFeatureSyncService, [FeatureFlagService]);

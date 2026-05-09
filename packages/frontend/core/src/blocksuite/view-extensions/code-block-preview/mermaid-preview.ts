@@ -1,4 +1,9 @@
-import { renderMermaidSvg } from '@affine/core/modules/code-block-preview-renderer/bridge';
+import {
+  getMermaidRendererMode,
+  renderMermaidSvg,
+  setMermaidRendererMode,
+} from '@affine/core/modules/code-block-preview-renderer';
+import type { MermaidRendererMode } from '@affine/core/modules/code-block-preview-renderer';
 import { CodeBlockPreviewExtension } from '@blocksuite/affine/blocks/code';
 import { SignalWatcher, WithDisposable } from '@blocksuite/affine/global/lit';
 import type { CodeBlockModel } from '@blocksuite/affine/model';
@@ -72,7 +77,7 @@ export class MermaidPreview extends SignalWatcher(
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.1s ease-out;
+      transform-origin: 0 0;
     }
 
     .mermaid-preview-svg > div {
@@ -136,6 +141,59 @@ export class MermaidPreview extends SignalWatcher(
       color: ${unsafeCSSVarV2('text/secondary')};
       z-index: 10;
     }
+
+    .mermaid-renderer-selector {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .mermaid-renderer-badge {
+      background: ${unsafeCSSVarV2('layer/background/overlayPanel')};
+      border: 1px solid ${unsafeCSSVarV2('layer/insideBorder/border')};
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      text-transform: uppercase;
+      font-weight: 500;
+      color: ${unsafeCSSVarV2('text/secondary')};
+    }
+
+    .mermaid-renderer-badge.wasm {
+      color: ${unsafeCSSVarV2('button/success')};
+    }
+
+    .mermaid-renderer-badge.classic {
+      color: ${unsafeCSSVarV2('button/error')};
+    }
+
+    .mermaid-renderer-select {
+      appearance: none;
+      background: ${unsafeCSSVarV2('layer/background/primary')};
+      border: 1px solid ${unsafeCSSVarV2('layer/insideBorder/border')};
+      border-radius: 4px;
+      padding: 4px 24px 4px 8px;
+      font-size: 11px;
+      color: ${unsafeCSSVarV2('text/primary')};
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 6px center;
+    }
+
+    .mermaid-renderer-select:hover {
+      border-color: ${unsafeCSSVarV2('layer/insideBorder/primaryBorder')};
+    }
+
+    .mermaid-renderer-select:focus {
+      outline: none;
+      border-color: ${unsafeCSSVarV2('button/primary')};
+    }
   `;
 
   @property({ attribute: false })
@@ -149,6 +207,9 @@ export class MermaidPreview extends SignalWatcher(
 
   @state()
   accessor svgContent: string = '';
+
+  @state()
+  accessor currentRenderer: 'classic' | 'wasm' | null = null;
 
   @query('.mermaid-preview-container')
   accessor container!: HTMLDivElement;
@@ -220,12 +281,12 @@ export class MermaidPreview extends SignalWatcher(
   }
 
   private _zoomIn() {
-    this.scale = Math.min(this.scale * 1.2, 5);
+    this.scale = Math.min(this.scale * 1.1, 5);
     this._updateTransform();
   }
 
   private _zoomOut() {
-    this.scale = Math.max(this.scale / 1.2, 0.1);
+    this.scale = Math.max(this.scale / 1.1, 0.3);
     this._updateTransform();
   }
 
@@ -233,6 +294,15 @@ export class MermaidPreview extends SignalWatcher(
     // trigger re-render to update transform
     this.requestUpdate();
   }
+
+  private readonly _changeRendererMode = (event: Event) => {
+    const select = event.target as HTMLSelectElement;
+    const mode = select.value as MermaidRendererMode;
+    setMermaidRendererMode(mode);
+    // Re-render with new mode
+    this.currentRenderer = null;
+    this._scheduleRender();
+  };
 
   private readonly _handleMouseDown = (event: MouseEvent) => {
     if (event.button !== 0) return; // only handle left click
@@ -265,9 +335,9 @@ export class MermaidPreview extends SignalWatcher(
   private readonly _handleWheel = (event: WheelEvent) => {
     event.preventDefault();
 
-    const delta = event.deltaY > 0 ? 0.9 : 1.1;
+    const delta = event.deltaY > 0 ? 0.96 : 1.04;
     const previousScale = this.scale;
-    const newScale = Math.max(0.1, Math.min(5, previousScale * delta));
+    const newScale = Math.max(0.3, Math.min(5, previousScale * delta));
 
     // calculate mouse position relative to container
     const rect = this.container.getBoundingClientRect();
@@ -324,7 +394,7 @@ export class MermaidPreview extends SignalWatcher(
     }
 
     try {
-      const { svg } = await renderMermaidSvg({
+      const result = await renderMermaidSvg({
         code,
         options: {
           fastText: true,
@@ -335,7 +405,8 @@ export class MermaidPreview extends SignalWatcher(
       });
 
       // update SVG content
-      this.svgContent = svg;
+      this.svgContent = result.svg;
+      this.currentRenderer = result.rendererUsed ?? null;
       this.state = 'finish';
       this.retryCount = 0; // reset retry count
 
@@ -448,6 +519,25 @@ export class MermaidPreview extends SignalWatcher(
                   >
                     ⟳
                   </button>
+                </div>
+                <div class="mermaid-renderer-selector">
+                  <select
+                    class="mermaid-renderer-select"
+                    title="Select mermaid renderer"
+                    .value=${getMermaidRendererMode()}
+                    @change=${this._changeRendererMode}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="classic">Classic JS</option>
+                    <option value="wasm">WASM (Rust)</option>
+                  </select>
+                  ${this.currentRenderer
+                    ? html`<span
+                        class="mermaid-renderer-badge ${this.currentRenderer}"
+                      >
+                        ${this.currentRenderer}
+                      </span>`
+                    : nothing}
                 </div>
                 <div class="mermaid-scale-info">
                   ${Math.round(this.scale * 100)}%

@@ -52,11 +52,14 @@ export async function renderMermaidSvg(
 ): Promise<MermaidRenderResult> {
   const rendered = await renderMermaidSvgBackend(request);
 
-  const sanitizedSvg = sanitizeSvg(rendered.svg);
-  if (!sanitizedSvg) {
+  // Mermaid's securityLevel: 'strict' already sanitizes the output.
+  // Skipping DOMPurify sanitization to preserve <foreignObject> content
+  // used by classDiagram and other diagram types for text rendering.
+  const svg = rendered.svg?.trim();
+  if (!svg || !/^\s*<svg[\s>]/i.test(svg)) {
     throw new Error('Preview renderer returned invalid SVG.');
   }
-  return { svg: sanitizedSvg };
+  return { svg, rendererUsed: rendered.rendererUsed };
 }
 
 export async function renderTypstSvg(

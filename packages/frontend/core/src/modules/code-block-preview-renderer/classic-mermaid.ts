@@ -57,6 +57,6 @@ export async function renderClassicMermaidSvg(
     mermaid.initialize(createClassicMermaidConfig(request.options));
 
     const { svg } = await mermaid.render(createDiagramId(), request.code);
-    return { svg };
+    return { svg, rendererUsed: 'classic' };
   });
 }
