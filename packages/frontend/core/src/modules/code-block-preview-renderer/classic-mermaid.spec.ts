@@ -55,8 +55,8 @@ describe('renderClassicMermaidSvg', () => {
 
     releaseFirstRender();
 
-    await expect(first).resolves.toEqual({ svg: '<svg>first</svg>' });
-    await expect(second).resolves.toEqual({ svg: '<svg>second</svg>' });
+    await expect(first).resolves.toEqual({ svg: '<svg>first</svg>', rendererUsed: 'classic' });
+    await expect(second).resolves.toEqual({ svg: '<svg>second</svg>', rendererUsed: 'classic' });
     expect(events).toEqual([
       'init:default',
       'render:first:start',
