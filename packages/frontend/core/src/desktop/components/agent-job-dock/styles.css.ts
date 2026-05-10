@@ -486,3 +486,53 @@ export const rejectBtn = style({
     },
   },
 });
+
+// Diff Preview
+export const diffPreview = style({
+  margin: '8px 0',
+  borderRadius: 4,
+  overflow: 'hidden',
+});
+
+export const diffSection = style({
+  marginBottom: 4,
+  selectors: {
+    '&:last-child': {
+      marginBottom: 0,
+    },
+  },
+});
+
+export const diffBeforeLabel = style({
+  fontSize: 10,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  padding: '2px 6px',
+  background: '#fee2e2',
+  color: '#991b1b',
+  display: 'inline-block',
+  borderRadius: 2,
+});
+
+export const diffAfterLabel = style({
+  fontSize: 10,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  padding: '2px 6px',
+  background: '#dcfce7',
+  color: '#166534',
+  display: 'inline-block',
+  borderRadius: 2,
+});
+
+export const diffContent = style({
+  fontFamily: 'monospace',
+  fontSize: 11,
+  padding: '4px 6px',
+  background: '#f8fafc',
+  borderRadius: 2,
+  whiteSpace: 'pre-wrap',
+  wordBreak: 'break-word',
+  margin: 0,
+  marginTop: 4,
+});

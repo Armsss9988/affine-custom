@@ -248,6 +248,8 @@ function ApprovalItem({
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
+  const hasDiff = approval.diffPreview?.before || approval.diffPreview?.after;
+
   if (approval.status !== 'pending') {
     return (
       <div className={styles.approvalItem}>
@@ -265,6 +267,26 @@ function ApprovalItem({
       <div className={styles.approvalContent}>
         <div className={styles.approvalTitle}>{approval.title}</div>
         <div className={styles.approvalDescription}>{approval.description}</div>
+        {hasDiff && approval.diffPreview && (
+          <div className={styles.diffPreview}>
+            {approval.diffPreview.before && (
+              <div className={styles.diffSection}>
+                <span className={styles.diffBeforeLabel}>Before</span>
+                <pre className={styles.diffContent}>
+                  {approval.diffPreview.before}
+                </pre>
+              </div>
+            )}
+            {approval.diffPreview.after && (
+              <div className={styles.diffSection}>
+                <span className={styles.diffAfterLabel}>After</span>
+                <pre className={styles.diffContent}>
+                  {approval.diffPreview.after}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
         <div className={styles.approvalActions}>
           <button
             className={styles.approveBtn}
