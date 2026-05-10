@@ -1,3 +1,4 @@
+import { toast } from '@affine/component';
 import {
   AgentRuntimeService,
   type AgentJob,
@@ -11,7 +12,7 @@ import {
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
 import { useLiveData, useService } from '@toeverything/infra';
 import clsx from 'clsx';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import * as styles from './styles.css';
 
@@ -401,6 +402,24 @@ export const AgentJobDock = () => {
   const activeCount = useLiveData(agentRuntime.activeJobCount$);
   const [open, setOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const prevJobsRef = useRef<Map<string, AgentJobStatus>>(new Map());
+
+  // Toast notifications for job status changes
+  useEffect(() => {
+    const current = new Map(jobs.map(j => [j.id, j.status]));
+    for (const job of jobs) {
+      const prev = prevJobsRef.current.get(job.id);
+      if (prev && prev !== job.status) {
+        if (job.status === 'succeeded') {
+          toast(`✅ Job done: ${job.title}`, { portal: document.body });
+        } else if (job.status === 'failed') {
+          toast(`❌ Job failed: ${job.title}`, { portal: document.body });
+        }
+      }
+    }
+    prevJobsRef.current = current;
+  }, [jobs]);
 
   const selectedJob = jobs.find(j => j.id === selectedJobId);
 
