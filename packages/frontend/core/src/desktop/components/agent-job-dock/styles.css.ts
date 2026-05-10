@@ -150,6 +150,26 @@ export const statusWaiting = style({
 });
 
 export const jobProgress = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+});
+
+export const progressBarContainer = style({
+  height: 4,
+  background: '#e2e8f0',
+  borderRadius: 2,
+  overflow: 'hidden',
+});
+
+export const progressBarFill = style({
+  height: '100%',
+  background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+  borderRadius: 2,
+  transition: 'width 0.3s ease',
+});
+
+export const progressText = style({
   fontSize: 11,
   color: cssVar('textSecondaryColor'),
 });

@@ -128,7 +128,15 @@ function JobItem({
         </span>
       </div>
       <div className={styles.jobProgress}>
-        {job.progress.label} — {job.progress.percent}%
+        <div className={styles.progressBarContainer}>
+          <div
+            className={styles.progressBarFill}
+            style={{ width: `${job.progress.percent}%` }}
+          />
+        </div>
+        <span className={styles.progressText}>
+          {job.progress.label} — {job.progress.percent}%
+        </span>
       </div>
       <div className={styles.jobActions}>
         {canCancel && (
