@@ -26,3 +26,8 @@ export type AIChatInputContext = {
   ChatContextValue,
   'snapshot' | 'combinedElementsMarkdown' | 'attachments' | 'docs' | 'html'
 >;
+
+export interface EnqueueAgentJobPayload {
+  text: string;
+  chatContextValue: AIChatInputContext;
+}

@@ -41,6 +41,7 @@ import {
 } from './error';
 
 export enum Endpoint {
+  Chat = 'stream',
   Action = 'action',
   StreamObject = 'stream-object',
   Images = 'images',

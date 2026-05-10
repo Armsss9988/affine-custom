@@ -20,6 +20,10 @@ import { useAIChatConfig } from '@affine/core/components/hooks/affine/use-ai-cha
 import { useAISpecs } from '@affine/core/components/hooks/affine/use-ai-specs';
 import { useAISubscribe } from '@affine/core/components/hooks/affine/use-ai-subscribe';
 import {
+  AgentRuntimeService,
+  createAgentContextSnapshot,
+} from '@affine/core/modules/agent-runtime';
+import {
   AIDraftService,
   AIToolsConfigService,
 } from '@affine/core/modules/ai-button';
@@ -113,6 +117,25 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
   const doc = editor?.doc;
   const host = editor?.host;
   const workspaceId = doc?.workspace.id;
+
+  const agentRuntime = useService(AgentRuntimeService);
+
+  const runDemoAgent = useCallback(() => {
+    if (!doc || !workspaceId) return;
+    const context = createAgentContextSnapshot({
+      workspaceId,
+      docId: doc.id,
+      docTitle: doc.meta?.title || 'Untitled',
+      viewMode: 'page',
+    });
+    agentRuntime.enqueue({
+      workspaceId,
+      title: 'Demo Agent Job',
+      userPrompt: 'Create a summary document from the current page',
+      context,
+      priority: 'high',
+    });
+  }, [doc, workspaceId, agentRuntime]);
 
   const [sessionServiceReady, setSessionServiceReady] = useState(
     () => !!AIProvider.session
@@ -798,6 +821,20 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
                 <CenterPeekIcon />
               </div>
             ) : null}
+            <div
+              className={styles.playground}
+              onClick={runDemoAgent}
+              title="Run Demo Agent Job"
+              style={{
+                cursor: 'pointer',
+                fontSize: 12,
+                padding: '0 8px',
+                border: '1px solid var(--affine-border-color)',
+                borderRadius: 4,
+              }}
+            >
+              Demo Job
+            </div>
             <div
               className={styles.tabsContainer}
               ref={onChatTabsContainerRef}

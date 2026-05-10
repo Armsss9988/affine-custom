@@ -16,6 +16,7 @@ import { AIButtonProvider } from './provider/ai-button';
 import { AIButtonService } from './services/ai-button';
 import { AIDraftService } from './services/ai-draft';
 import { AIModelService } from './services/models';
+export { AIModelService };
 import { AIPlaygroundService } from './services/playground';
 import { AIReasoningService } from './services/reasoning';
 import { AIToolsConfigService } from './services/tools-config';

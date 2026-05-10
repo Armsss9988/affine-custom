@@ -313,6 +313,14 @@ export const AFFINE_FLAGS = {
     configurable: true,
     defaultState: false,
   },
+  enable_agent_runtime: {
+    category: 'affine',
+    displayName: 'Enable AI Agent Runtime',
+    description:
+      'Enable background AI agent jobs that continue running when you switch pages. Experimental.',
+    configurable: true,
+    defaultState: false,
+  },
 } satisfies { [key in string]: FlagInfo };
 
 // oxlint-disable-next-line no-redeclare
