@@ -53,13 +53,18 @@ export const fakeCreateArtifactTool: AgentTool<
   riskLevel: 'create',
   inputSchema: { title: 'string', content: 'string' },
   async execute(input, ctx: ToolExecutionContext) {
+    const artifactId = `artifact-${Date.now()}`;
     ctx.addLog({
       level: 'info',
       message: `Creating artifact: ${input.title}`,
     });
-    // In a real tool, this would create something in AFFiNE.
-    // Here we just return a fake ID.
-    return { artifactId: `artifact-${Date.now()}` };
+    // Add artifact to job (mirrors real tool behavior)
+    ctx.addArtifact({
+      type: 'text',
+      title: input.title,
+      content: input.content,
+    });
+    return { artifactId };
   },
 };
 

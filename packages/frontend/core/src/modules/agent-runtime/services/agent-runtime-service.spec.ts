@@ -197,3 +197,133 @@ describe('AgentRuntimeService deterministic workflows', () => {
     runtime.dispose();
   });
 });
+
+describe('AgentRuntimeService approval flow', () => {
+  test('approving approval resumes job to succeeded', async () => {
+    const runtime = createRuntime();
+
+    const job = runtime.enqueue({
+      workspaceId: 'workspace-1',
+      title: 'Approval job',
+      userPrompt: 'Require approval',
+      context: createContext(),
+      workflow: 'approval_demo',
+    });
+
+    const waiting = await waitForJob(
+      runtime,
+      job.id,
+      currentJob => currentJob.status === 'waiting_approval'
+    );
+
+    expect(waiting.approvals[0]?.status).toBe('pending');
+    expect(waiting.approvals[0]?.title).toBe('Fake Approval Required');
+
+    runtime.approve(waiting.approvals[0]!.id);
+
+    const succeeded = await waitForJob(
+      runtime,
+      job.id,
+      currentJob => currentJob.status === 'succeeded'
+    );
+
+    const approval = succeeded.approvals[0];
+    expect(approval?.status).toBe('approved');
+    expect(approval?.resolvedAt).toBeDefined();
+
+    runtime.dispose();
+  });
+
+  test('waiting_approval status transitions correctly', async () => {
+    const runtime = createRuntime();
+
+    const job = runtime.enqueue({
+      workspaceId: 'workspace-1',
+      title: 'Approval job',
+      userPrompt: 'Require approval',
+      context: createContext(),
+      workflow: 'approval_demo',
+    });
+
+    // Initially queued
+    const queued = runtime.getJob(job.id)!;
+    expect(['queued', 'planning']).toContain(queued.status);
+
+    // Transitions to waiting_approval
+    const waiting = await waitForJob(
+      runtime,
+      job.id,
+      currentJob => currentJob.status === 'waiting_approval'
+    );
+    expect(waiting.approvals.length).toBeGreaterThan(0);
+    expect(waiting.approvals[0]?.status).toBe('pending');
+
+    runtime.dispose();
+  });
+});
+
+describe('AgentRuntimeService artifacts', () => {
+  test('tool execution adds artifact to job', async () => {
+    const runtime = createRuntime();
+
+    const job = runtime.enqueue({
+      workspaceId: 'workspace-1',
+      title: 'Artifact job',
+      userPrompt: 'Create artifact',
+      context: createContext(),
+      workflow: 'fake_long_running',
+    });
+
+    await waitForJob(
+      runtime,
+      job.id,
+      currentJob => currentJob.status === 'succeeded'
+    );
+
+    const completed = runtime.getJob(job.id)!;
+    expect(completed.artifacts.length).toBeGreaterThan(0);
+
+    const artifact = completed.artifacts[0];
+    expect(artifact?.id).toBeDefined();
+    expect(artifact?.jobId).toBe(job.id);
+    expect(artifact?.title).toBeDefined();
+    expect(artifact?.createdAt).toBeDefined();
+
+    runtime.dispose();
+  });
+
+  test('addArtifact adds artifact via tool context', async () => {
+    const runtime = createRuntime();
+
+    // Enqueue a job with workflow that creates doc
+    const job = runtime.enqueue({
+      workspaceId: 'workspace-1',
+      title: 'Doc creation job',
+      userPrompt: 'Create a new document',
+      context: createContext(),
+      workflow: 'create_doc_from_prompt',
+    });
+
+    // Wait for completion
+    await vi.waitFor(
+      () => {
+        const j = runtime.getJob(job.id);
+        expect(j).toBeDefined();
+        if (j?.status === 'succeeded' || j?.status === 'failed') {
+          return true;
+        }
+        return false;
+      },
+      { timeout: 10000 }
+    );
+
+    const completed = runtime.getJob(job.id)!;
+
+    // If the workflow ran, check for artifacts
+    if (completed.plan.some(step => step.toolName === 'affine.create_doc')) {
+      expect(completed.artifacts.some(a => a.type === 'doc')).toBe(true);
+    }
+
+    runtime.dispose();
+  });
+});

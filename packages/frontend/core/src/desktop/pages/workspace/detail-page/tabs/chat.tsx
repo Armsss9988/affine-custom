@@ -119,23 +119,44 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
   const workspaceId = doc?.workspace.id;
 
   const agentRuntime = useService(AgentRuntimeService);
+  const featureFlags = useService(FeatureFlagService).flags;
+
+  // User input in chat for potential agent job use
+  const [currentAgentJobInput, setCurrentAgentJobInput] = useState('');
+
+  // Handler for when user sends a chat message (stores input for agent jobs)
+  const handleAgentJobInputChange = useCallback((input: string) => {
+    setCurrentAgentJobInput(input);
+  }, []);
 
   const runDemoAgent = useCallback(() => {
     if (!doc || !workspaceId) return;
+
+    // Build combined prompt including markdown context if available
+    const userPrompt = chatContent?.chatContextValue.markdown
+      ? `Context from page:\n${chatContent.chatContextValue.markdown}\n\nUser request: ${currentAgentJobInput}`
+      : currentAgentJobInput ||
+        'Create a summary document from the current page';
+
     const context = createAgentContextSnapshot({
       workspaceId,
       docId: doc.id,
       docTitle: doc.meta?.title || 'Untitled',
       viewMode: 'page',
     });
+
     agentRuntime.enqueue({
       workspaceId,
-      title: 'Demo Agent Job',
-      userPrompt: 'Create a summary document from the current page',
+      title: userPrompt.slice(0, 60),
+      userPrompt,
       context,
       priority: 'high',
+      workflow: 'llm_planner',
     });
-  }, [doc, workspaceId, agentRuntime]);
+
+    // Clear stored input after enqueuing
+    setCurrentAgentJobInput('');
+  }, [doc, workspaceId, agentRuntime, currentAgentJobInput, chatContent]);
 
   const [sessionServiceReady, setSessionServiceReady] = useState(
     () => !!AIProvider.session
@@ -573,6 +594,7 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     content.subscriptionService = framework.get(SubscriptionService);
     content.aiModelService = framework.get(AIModelService);
     content.onAISubscribe = handleAISubscribe;
+    content.onRunAgentJob = handleAgentJobInputChange;
     content.onEmbeddingProgressChange = onEmbeddingProgressChange;
     content.onContextChange = onContextChange;
     content.width = sidebarWidthSignal;
@@ -592,6 +614,7 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     docDisplayConfig,
     framework,
     handleAISubscribe,
+    handleAgentJobInputChange,
     host,
     isBodyProvided,
     notificationService,
@@ -816,25 +839,28 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
                 t['com.affine.ai.chat-panel.title']()
               )}
             </div>
-            {playgroundVisible ? (
+            {playgroundVisible && !featureFlags.enable_agent_runtime.$ ? (
               <div className={styles.playground} onClick={openPlayground}>
                 <CenterPeekIcon />
               </div>
             ) : null}
-            <div
-              className={styles.playground}
-              onClick={runDemoAgent}
-              title="Run Demo Agent Job"
-              style={{
-                cursor: 'pointer',
-                fontSize: 12,
-                padding: '0 8px',
-                border: '1px solid var(--affine-border-color)',
-                borderRadius: 4,
-              }}
-            >
-              Demo Job
-            </div>
+            {featureFlags.enable_agent_runtime.$ ? (
+              <div
+                className={styles.playground}
+                onClick={runDemoAgent}
+                title="Run as Agent Job"
+                style={{
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  padding: '0 8px',
+                  border: '1px solid var(--affine-border-color)',
+                  borderRadius: 4,
+                  background: 'var(--affine-hover-color)',
+                }}
+              >
+                Run Agent Job
+              </div>
+            ) : null}
             <div
               className={styles.tabsContainer}
               ref={onChatTabsContainerRef}
