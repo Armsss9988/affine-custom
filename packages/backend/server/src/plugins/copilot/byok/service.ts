@@ -43,6 +43,7 @@ export type ByokKeyConfig = {
   enabled: boolean;
   endpoint: string | null;
   endpointEditable: boolean;
+  model: string | null;
   sortOrder: number;
   capabilities: string[];
   testStatus: ByokKeyTestStatus;
@@ -78,6 +79,7 @@ export type ByokLocalLeaseProvider = {
   description?: string | null;
   apiKey: string;
   endpoint?: string | null;
+  model?: string | null;
   sortOrder?: number | null;
   enabled?: boolean | null;
 };
@@ -182,6 +184,7 @@ export class ByokService {
     storage: ByokKeyStorage;
     apiKey?: string | null;
     endpoint?: string | null;
+    model?: string | null;
     sortOrder?: number | null;
     enabled?: boolean | null;
     userId?: string;
@@ -215,8 +218,12 @@ export class ByokService {
         : (existing?.description ?? null);
     const endpoint =
       input.endpoint !== undefined
-        ? this.normalizeEndpoint(input.endpoint)
+        ? this.normalizeEndpoint(input.endpoint, input.provider)
         : (existing?.endpoint ?? null);
+    const model =
+      input.model !== undefined
+        ? input.model?.trim() || null
+        : (existing as any)?.model ?? null;
     const sortOrder = input.sortOrder ?? existing?.sortOrder ?? 0;
     const enabled = input.enabled ?? existing?.enabled ?? true;
 
@@ -228,6 +235,7 @@ export class ByokService {
       description,
       encryptedApiKey,
       endpoint,
+      model,
       sortOrder,
       enabled,
       userId: input.userId,
@@ -282,6 +290,7 @@ export class ByokService {
     storage: ByokKeyStorage;
     apiKey?: string | null;
     endpoint?: string | null;
+    model?: string | null;
     configId?: string | null;
     userId?: string;
   }) {
@@ -299,7 +308,7 @@ export class ByokService {
     }
     this.assertProvider(input.provider);
     let apiKey = input.apiKey;
-    let endpoint = this.normalizeEndpoint(input.endpoint);
+    let endpoint = this.normalizeEndpoint(input.endpoint, input.provider);
     if (!apiKey && input.configId && input.storage === ByokKeyStorage.server) {
       const config = await this.models.copilotWorkspaceByokConfig.get(
         input.configId
@@ -315,7 +324,7 @@ export class ByokService {
       endpoint =
         input.endpoint !== undefined
           ? endpoint
-          : this.normalizeEndpoint(config.endpoint);
+          : this.normalizeEndpoint(config.endpoint, input.provider);
     }
     if (!apiKey) {
       throw new BadRequestException('apiKey is required.');
@@ -368,7 +377,7 @@ export class ByokService {
     await this.entitlement.assertLocalEntitled(input.workspaceId, input.userId);
     const providers = input.providers.map(provider => {
       this.assertProvider(provider.provider);
-      const endpoint = this.normalizeEndpoint(provider.endpoint);
+      const endpoint = this.normalizeEndpoint(provider.endpoint, provider.provider);
       return { ...provider, endpoint };
     });
     const activeCacheKey = this.localLeaseActiveCacheKey({
@@ -389,6 +398,7 @@ export class ByokService {
         description: provider.description,
         encryptedApiKey: this.crypto.encrypt(provider.apiKey),
         endpoint: provider.endpoint,
+        model: provider.model ?? null,
         sortOrder: provider.sortOrder,
         enabled: provider.enabled,
       })),
@@ -524,22 +534,23 @@ export class ByokService {
     const rows =
       await this.models.copilotWorkspaceByokConfig.listEnabled(workspaceId);
 
-    return rows
-      .filter(row => isByokProvider(row.provider))
-      .map((row, index): CopilotProviderProfile => {
-        const provider = row.provider as ByokProvider;
-        return {
-          id: this.profileId(workspaceId, provider, row.id, 'server'),
-          type: byokProviderToCopilotType(provider),
-          priority:
-            BYOK_PROFILE_PRIORITY_BASE - SERVER_PROFILE_PRIORITY_OFFSET - index,
-          config: this.providerConfig(
-            provider,
-            row.encryptedApiKey,
-            row.endpoint
-          ),
-        } as CopilotProviderProfile;
-      });
+      return rows
+        .filter(row => isByokProvider(row.provider))
+        .map((row, index): CopilotProviderProfile => {
+          const provider = row.provider as ByokProvider;
+          return {
+            id: this.profileId(workspaceId, provider, row.id, 'server'),
+            type: byokProviderToCopilotType(provider),
+            priority:
+              BYOK_PROFILE_PRIORITY_BASE - SERVER_PROFILE_PRIORITY_OFFSET - index,
+            config: this.providerConfig(
+              provider,
+              row.encryptedApiKey,
+              row.endpoint
+            ),
+            model: row.model ?? undefined,
+          } as CopilotProviderProfile;
+        });
   }
 
   private async getLocalProfiles(context: ByokProviderRequestContext) {
@@ -581,6 +592,7 @@ export class ByokService {
             provider.encryptedApiKey,
             provider.endpoint ?? null
           ),
+          model: provider.model ?? undefined,
         } as CopilotProviderProfile;
       });
   }
@@ -593,6 +605,7 @@ export class ByokService {
     const apiKey = this.crypto.decrypt(encryptedApiKey);
     switch (provider) {
       case ByokProvider.openai:
+      case ByokProvider.openai_compatible:
       case ByokProvider.gemini:
       case ByokProvider.anthropic:
         return { apiKey, ...(endpoint ? { baseURL: endpoint } : {}) };
@@ -619,7 +632,7 @@ export class ByokService {
     workspaceId?: string
   ): ByokProfileMeta | null {
     const match =
-      /^byok-([a-f0-9]{12})-(openai|anthropic|gemini|fal)-(.+)$/.exec(
+      /^byok-([a-f0-9]{12})-(openai|anthropic|gemini|fal|openai_compatible)-(.+)$/.exec(
         providerId
       );
     if (!match) return null;
@@ -643,6 +656,7 @@ export class ByokService {
     name: string;
     description: string | null;
     endpoint: string | null;
+    model: string | null;
     sortOrder: number;
     enabled: boolean;
     disabledReason: string | null;
@@ -662,7 +676,8 @@ export class ByokService {
       configured: true,
       enabled: row.enabled,
       endpoint: row.endpoint,
-      endpointEditable: this.customEndpointSupported,
+      endpointEditable: provider === ByokProvider.openai_compatible || this.customEndpointSupported,
+      model: row.model,
       sortOrder: row.sortOrder,
       capabilities: this.capabilities(provider, 'server'),
       testStatus: row.lastValidationError
@@ -682,6 +697,7 @@ export class ByokService {
   private capabilities(provider: ByokProvider, storage: 'server' | 'local') {
     switch (provider) {
       case ByokProvider.openai:
+      case ByokProvider.openai_compatible:
         return ['Text', 'Image input', 'Actions', 'Image generate'];
       case ByokProvider.anthropic:
         return ['Text', 'Image input'];
@@ -727,9 +743,12 @@ export class ByokService {
     ];
   }
 
-  private normalizeEndpoint(endpoint?: string | null) {
+  private normalizeEndpoint(endpoint?: string | null, provider?: ByokProvider) {
     if (!endpoint) return null;
-    if (!this.customEndpointSupported) {
+    if (
+      provider !== ByokProvider.openai_compatible &&
+      !this.customEndpointSupported
+    ) {
       throw new BadRequestException('Custom BYOK endpoint is not supported.');
     }
     let parsed: URL;
@@ -781,6 +800,7 @@ export class ByokService {
   ) {
     switch (provider) {
       case ByokProvider.openai:
+      case ByokProvider.openai_compatible:
         return {
           method: 'GET',
           url: `${endpoint ?? 'https://api.openai.com/v1'}/models`,
@@ -872,6 +892,7 @@ export class ByokService {
             description: provider.description ?? null,
             apiKey: provider.apiKey,
             endpoint: provider.endpoint ?? null,
+            model: provider.model ?? null,
             sortOrder: provider.sortOrder ?? 0,
             enabled: provider.enabled ?? true,
           }))
