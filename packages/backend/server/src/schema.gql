@@ -304,6 +304,7 @@ enum ByokProvider {
   fal
   gemini
   openai
+  openai_compatible
 }
 
 type CalendarAccountObjectType {

@@ -7,6 +7,7 @@ export enum ByokProvider {
   anthropic = 'anthropic',
   gemini = 'gemini',
   fal = 'fal',
+  openai_compatible = 'openai_compatible',
 }
 
 export enum ByokKeyStorage {
@@ -40,11 +41,13 @@ export const BYOK_ALLOWED_PROVIDERS = [
   ByokProvider.anthropic,
   ByokProvider.gemini,
   ByokProvider.fal,
+  ByokProvider.openai_compatible,
 ] as const;
 
 export function byokProviderToCopilotType(provider: ByokProvider) {
   switch (provider) {
     case ByokProvider.openai:
+    case ByokProvider.openai_compatible:
       return CopilotProviderType.OpenAI;
     case ByokProvider.anthropic:
       return CopilotProviderType.Anthropic;
@@ -58,7 +61,7 @@ export function byokProviderToCopilotType(provider: ByokProvider) {
 export function copilotTypeToByokProvider(type: CopilotProviderType) {
   switch (type) {
     case CopilotProviderType.OpenAI:
-      return ByokProvider.openai;
+      return null; // could be openai or openai_compatible
     case CopilotProviderType.Anthropic:
       return ByokProvider.anthropic;
     case CopilotProviderType.Gemini:
