@@ -16,6 +16,7 @@ export const providerLabels: Record<ByokProvider, string> = {
   [ByokProvider.anthropic]: 'Anthropic',
   [ByokProvider.gemini]: 'Gemini',
   [ByokProvider.fal]: 'FAL',
+  [ByokProvider.openai_compatible]: 'OpenAI Compatible',
 };
 
 export function storageLabel(t: I18nInstance, storage: ByokStorage) {
@@ -27,6 +28,7 @@ export function storageLabel(t: I18nInstance, storage: ByokStorage) {
 export function capabilitiesFor(provider: ByokProvider, storage: ByokStorage) {
   switch (provider) {
     case ByokProvider.openai:
+    case ByokProvider.openai_compatible:
       return ['Text', 'Image input', 'Actions', 'Image generate'];
     case ByokProvider.anthropic:
       return ['Text', 'Image input'];
@@ -75,6 +77,7 @@ export const capabilityRows = [
       ByokProvider.openai,
       ByokProvider.anthropic,
       ByokProvider.gemini,
+      ByokProvider.openai_compatible,
     ],
     coverageCapabilities: ['Text'],
   },
@@ -83,7 +86,7 @@ export const capabilityRows = [
     featureKind: 'action',
     fallbackKey: 'feature.action.fallback',
     icon: 'action',
-    providers: [ByokProvider.openai, ByokProvider.gemini],
+    providers: [ByokProvider.openai, ByokProvider.gemini, ByokProvider.openai_compatible],
     coverageCapabilities: ['Actions'],
   },
   {
@@ -91,7 +94,7 @@ export const capabilityRows = [
     featureKind: 'image',
     fallbackKey: 'feature.image.fallback',
     icon: 'image',
-    providers: [ByokProvider.openai, ByokProvider.gemini, ByokProvider.fal],
+    providers: [ByokProvider.openai, ByokProvider.gemini, ByokProvider.fal, ByokProvider.openai_compatible],
     coverageCapabilities: ['Image generate'],
   },
   {

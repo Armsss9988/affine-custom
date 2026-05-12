@@ -19,6 +19,7 @@ export type ByokKey = {
   enabled: boolean;
   endpoint?: string | null;
   endpointEditable: boolean;
+  model: string | null;
   sortOrder: number;
   capabilities: string[];
   testStatus: ByokKeyTestStatus;
