@@ -1,5 +1,9 @@
 mutation upsertWorkspaceByokConfig($input: UpsertWorkspaceByokConfigInput!) {
   upsertWorkspaceByokConfig(input: $input) {
     id
+    provider
+    name
+    endpoint
+    model
   }
 }

@@ -21,6 +21,7 @@ query workspaceByokSettings($id: String!, $from: DateTime!, $to: DateTime!) {
         enabled
         endpoint
         endpointEditable
+        model
         sortOrder
         capabilities
         testStatus

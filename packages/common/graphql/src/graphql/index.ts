@@ -3029,6 +3029,10 @@ export const upsertWorkspaceByokConfigMutation = {
   query: `mutation upsertWorkspaceByokConfig($input: UpsertWorkspaceByokConfigInput!) {
   upsertWorkspaceByokConfig(input: $input) {
     id
+    provider
+    name
+    endpoint
+    model
   }
 }`,
 };
@@ -3070,6 +3074,7 @@ export const workspaceByokSettingsQuery = {
         enabled
         endpoint
         endpointEditable
+        model
         sortOrder
         capabilities
         testStatus

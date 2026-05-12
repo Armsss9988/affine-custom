@@ -363,6 +363,7 @@ export enum ByokProvider {
   fal = 'fal',
   gemini = 'gemini',
   openai = 'openai',
+  openai_compatible = 'openai_compatible',
 }
 
 export interface CalendarAccountObjectType {
@@ -896,6 +897,7 @@ export interface CreateWorkspaceByokLocalLeaseProviderInput {
   description?: InputMaybe<Scalars['String']['input']>;
   enabled?: InputMaybe<Scalars['Boolean']['input']>;
   endpoint?: InputMaybe<Scalars['String']['input']>;
+  model?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   provider: ByokProvider;
   sortOrder?: InputMaybe<Scalars['SafeInt']['input']>;
@@ -3286,6 +3288,7 @@ export interface UpsertWorkspaceByokConfigInput {
   enabled?: InputMaybe<Scalars['Boolean']['input']>;
   endpoint?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['ID']['input']>;
+  model?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   provider: ByokProvider;
   sortOrder?: InputMaybe<Scalars['SafeInt']['input']>;
@@ -3430,6 +3433,7 @@ export interface WorkspaceByokKeyConfigType {
   lastTestError: Maybe<Scalars['String']['output']>;
   lastTestedAt: Maybe<Scalars['DateTime']['output']>;
   lastUsedAt: Maybe<Scalars['DateTime']['output']>;
+  model: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
   provider: ByokProvider;
   sortOrder: Scalars['SafeInt']['output'];
@@ -7664,6 +7668,10 @@ export type UpsertWorkspaceByokConfigMutation = {
   upsertWorkspaceByokConfig: {
     __typename?: 'WorkspaceByokKeyConfigType';
     id: string;
+    provider: ByokProvider;
+    name: string;
+    endpoint: string | null;
+    model: string | null;
   };
 };
 
@@ -7713,6 +7721,7 @@ export type WorkspaceByokSettingsQuery = {
         enabled: boolean;
         endpoint: string | null;
         endpointEditable: boolean;
+        model: string | null;
         sortOrder: number;
         capabilities: Array<string>;
         testStatus: ByokKeyTestStatus;
