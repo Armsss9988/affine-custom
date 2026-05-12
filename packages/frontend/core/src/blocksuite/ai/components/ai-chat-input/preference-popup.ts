@@ -216,6 +216,17 @@ export class ChatInputPreference extends SignalWatcher(
       })
     );
 
+    searchItems.push(
+      menu.toggleSwitch({
+        name: 'Web Search (Exa)',
+        prefix: CloudWorkspaceIcon(),
+        on: !!this.toolsConfigService.config.value.webSearch,
+        onChange: (value: boolean) =>
+          this.toolsConfigService.setConfig({ webSearch: value }),
+        class: { 'preference-action': true },
+      })
+    );
+
     popMenu(popupTargetFromElement(element), {
       options: {
         items: [

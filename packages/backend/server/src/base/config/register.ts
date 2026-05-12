@@ -215,6 +215,8 @@ export function defineModuleConfig<T extends keyof AppConfigSchema>(
 
 const CONFIG_JSON_PATHS = [
   join(env.projectRoot, 'config.json'),
+  // Monorepo dev config, e.g. AFFiNE launched from the repository root.
+  join(env.projectRoot, '..', '..', '..', 'config.json'),
   `${homedir()}/.affine/config/config.json`,
 ];
 function readConfigJSONOverrides(path: string) {

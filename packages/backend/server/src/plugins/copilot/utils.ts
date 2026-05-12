@@ -78,6 +78,13 @@ export function getTools(
           });
         }
         break;
+      case 'webSearch':
+        if (value === false) {
+          result = result.filter(tool => {
+            return tool !== 'webSearch';
+          });
+        }
+        break;
     }
   });
   return result;

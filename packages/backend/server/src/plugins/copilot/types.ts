@@ -28,7 +28,12 @@ const ToolsConfigSchema = z.preprocess(
     }
     return val || {};
   },
-  z.record(z.enum(['searchWorkspace', 'readingDocs']), z.boolean()).default({})
+  z
+    .record(
+      z.enum(['searchWorkspace', 'readingDocs', 'webSearch']),
+      z.boolean()
+    )
+    .default({})
 );
 
 export type ToolsConfig = z.infer<typeof ToolsConfigSchema>;
@@ -60,7 +65,7 @@ export const ChatQuerySchema = z
       byokLeaseId,
       retry,
       reasoning,
-      webSearch,
+      webSearch: toolsConfig.webSearch ?? webSearch,
       toolsConfig,
       params,
     })

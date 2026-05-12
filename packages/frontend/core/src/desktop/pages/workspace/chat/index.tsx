@@ -109,6 +109,8 @@ export const Component = () => {
   const chatToolContainerRef = useRef<HTMLDivElement>(null);
   const chatTabsContainerRef = useRef<HTMLDivElement | null>(null);
   const widthSignalRef = useRef<Signal<number>>(signal(0));
+  // Map of sessionId -> AIChatContent DOM node (preserved across tab switches)
+  const chatContentMapRef = useRef<Map<string, AIChatContent>>(new Map());
   const client = useCopilotClient();
   const workbench = useService(WorkbenchService).workbench;
 
@@ -168,23 +170,19 @@ export const Component = () => {
     }
   }, [client, createSession, currentSession, isTogglingPin, workspaceId]);
 
-  // remove the old content to trigger re-mount
-  // to avoid infinitely load and mount, should not make `chatContent` as dependency
-  const reMountChatContent = useCallback(() => {
-    setChatContent(prev => {
-      prev?.remove();
-      return null;
+  // Hide all cached nodes (used when switching sessions without remounting).
+  const hideCachedContent = useCallback(() => {
+    chatContentMapRef.current.forEach(node => {
+      node.style.display = 'none';
     });
   }, []);
 
   const createFreshSession = useCallback(async () => {
-    if (isOpeningSession) {
-      return;
-    }
+    if (isOpeningSession) return;
     setIsOpeningSession(true);
     try {
+      hideCachedContent();
       setCurrentSession(null);
-      reMountChatContent();
       const session = await client.createSessionWithHistory({
         workspaceId,
         promptName: 'Chat With AFFiNE AI' satisfies PromptKey,
@@ -196,7 +194,7 @@ export const Component = () => {
     } finally {
       setIsOpeningSession(false);
     }
-  }, [client, isOpeningSession, reMountChatContent, workspaceId]);
+  }, [client, hideCachedContent, isOpeningSession, workspaceId]);
 
   const onOpenSession = useCallback(
     async (sessionId: string) => {
@@ -209,8 +207,8 @@ export const Component = () => {
           setOpenTabs(prev => prev.filter(tab => tab.sessionId !== sessionId));
           return;
         }
+        hideCachedContent();
         setCurrentSession(session);
-        reMountChatContent();
         chatTool?.closeHistoryMenu();
       } catch (error) {
         console.error(error);
@@ -222,8 +220,8 @@ export const Component = () => {
       chatTool,
       client,
       currentSession?.sessionId,
+      hideCachedContent,
       isOpeningSession,
-      reMountChatContent,
       setOpenTabs,
       workspaceId,
     ]
@@ -231,6 +229,14 @@ export const Component = () => {
 
   const closeTab = useCallback(
     (sessionId: string) => {
+      // Remove and destroy the cached node for this tab.
+      const cached = chatContentMapRef.current.get(sessionId);
+      if (cached) {
+        cached.remove();
+        chatContentMapRef.current.delete(sessionId);
+        if (chatContent === cached) setChatContent(null);
+      }
+
       let fallback: NonNullable<CopilotSession> | undefined;
       setOpenTabs(prev => {
         const idx = prev.findIndex(tab => tab.sessionId === sessionId);
@@ -246,7 +252,13 @@ export const Component = () => {
         createFreshSession().catch(console.error);
       }
     },
-    [createFreshSession, currentSession?.sessionId, onOpenSession, setOpenTabs]
+    [
+      chatContent,
+      createFreshSession,
+      currentSession?.sessionId,
+      onOpenSession,
+      setOpenTabs,
+    ]
   );
 
   const onContextChange = useCallback((context: Partial<ChatContextValue>) => {
@@ -298,31 +310,43 @@ export const Component = () => {
         isActiveSession: sessionToDelete =>
           sessionToDelete.sessionId === currentSession?.sessionId,
         onActiveSessionDeleted: () => {
+          hideCachedContent();
           setCurrentSession(null);
-          reMountChatContent();
         },
       }),
     [
       client,
       currentSession?.sessionId,
+      hideCachedContent,
       notificationService,
-      reMountChatContent,
       t,
     ]
   );
 
-  // init or update ai-chat-content
+  // Show/hide cached AIChatContent nodes; create on first visit for each session.
   useEffect(() => {
-    if (!isBodyProvided) {
-      return;
-    }
+    if (!isBodyProvided || !chatContainerRef.current) return;
 
-    let content = chatContent;
+    const map = chatContentMapRef.current;
+    const container = chatContainerRef.current;
+    const sessionKey = currentSession?.sessionId ?? 'new';
 
+    // Hide all existing nodes.
+    map.forEach(node => {
+      node.style.display = 'none';
+    });
+
+    // Get or create the node for the active session.
+    let content = map.get(sessionKey) ?? null;
     if (!content) {
       content = new AIChatContent();
+      content.independentMode = true;
+      content.onboardingOffsetY = -100;
+      map.set(sessionKey, content);
     }
 
+    // Always update mutable props BEFORE appending (connectedCallback fires on first append).
+    content.style.display = '';
     content.session = currentSession;
     content.workspaceId = workspaceId;
     content.extensions = specs;
@@ -344,19 +368,25 @@ export const Component = () => {
     content.subscriptionService = framework.get(SubscriptionService);
     content.aiModelService = framework.get(AIModelService);
     content.onAISubscribe = handleAISubscribe;
-
     content.createSession = createSession;
     content.onOpenDoc = onOpenDoc;
 
-    if (!chatContent) {
-      // initial values that won't change
-      content.independentMode = true;
-      content.onboardingOffsetY = -100;
-      chatContainerRef.current?.append(content);
-      setChatContent(content);
+    // Re-attach any detached cached nodes to the (possibly new) container.
+    map.forEach((node, key) => {
+      if (node.parentElement !== container) {
+        node.style.display = 'none';
+        container.append(node);
+      }
+      if (key !== sessionKey) {
+        node.style.display = 'none';
+      }
+    });
+    if (content.parentElement !== container) {
+      container.append(content);
     }
+
+    setChatContent(content);
   }, [
-    chatContent,
     createSession,
     currentSession,
     docDisplayConfig,
@@ -500,7 +530,7 @@ export const Component = () => {
           shouldRemount = true;
           return pinnedSession;
         });
-        if (shouldRemount) reMountChatContent();
+        if (shouldRemount) hideCachedContent();
       } catch (error) {
         if (controller.signal.aborted) {
           return;
@@ -517,7 +547,7 @@ export const Component = () => {
     return () => {
       controller.abort();
     };
-  }, [client, currentSession, reMountChatContent, workspaceId]);
+  }, [client, currentSession, hideCachedContent, workspaceId]);
 
   const onChatContainerRef = useCallback((node: HTMLDivElement) => {
     if (node) {

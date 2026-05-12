@@ -87,6 +87,18 @@ export class AuthService implements OnApplicationBootstrap {
   }
 
   async signIn(email: string, password: string): Promise<CurrentUser> {
+    // If user doesn't exist and sign-up is allowed, auto-register with password.
+    // This replaces the magic-link email flow for local/selfhosted deployments.
+    const existing = await this.models.user.getUserByEmail(email);
+    if (!existing && this.config.auth.allowSignup) {
+      const newUser = await this.models.user.create({
+        email,
+        password,
+        registered: true,
+        emailVerifiedAt: new Date(),
+      });
+      return sessionUser(newUser);
+    }
     return this.models.user.signIn(email, password).then(sessionUser);
   }
 

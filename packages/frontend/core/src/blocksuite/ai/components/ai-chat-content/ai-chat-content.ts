@@ -195,6 +195,12 @@ export class AIChatContent extends SignalWatcher(
   @property({ attribute: false })
   accessor onAISubscribe!: () => Promise<void>;
 
+  @property({ attribute: false })
+  accessor onRunAgentJob: ((input: string) => void) | undefined;
+
+  @property({ attribute: false })
+  accessor onSendMessage: ((input: string) => void | Promise<void>) | undefined;
+
   @state()
   accessor chatContextValue: ChatContextValue = DEFAULT_CHAT_CONTEXT_VALUE;
 
@@ -230,7 +236,7 @@ export class AIChatContent extends SignalWatcher(
     return false;
   }
 
-  private readonly updateHistory = async () => {
+  readonly updateHistory = async () => {
     const currentRequest = ++this.updateHistoryCounter;
     if (!AIProvider.histories) {
       return;
@@ -478,6 +484,8 @@ export class AIChatContent extends SignalWatcher(
         .subscriptionService=${this.subscriptionService}
         .aiModelService=${this.aiModelService}
         .onAISubscribe=${this.onAISubscribe}
+        .onRunAgentJob=${this.onRunAgentJob}
+        .onSendMessage=${this.onSendMessage}
         .trackOptions=${{
           where: 'chat-panel',
           control: 'chat-send',

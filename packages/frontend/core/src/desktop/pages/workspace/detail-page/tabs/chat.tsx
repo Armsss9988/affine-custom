@@ -56,7 +56,6 @@ import {
 } from '../../chat-panel-utils';
 import * as styles from './chat.css';
 import {
-  getChatContentKey,
   resolveInitialSession,
   shouldResetChatPanelOnUserInfoChange,
   type WorkbenchLike,
@@ -97,8 +96,11 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     0, 0,
   ]);
   const [status, setStatus] = useState<ChatStatus>('idle');
-  const [hasPinned, setHasPinned] = useState(false);
+  const [_hasPinned, setHasPinned] = useState(false);
 
+  // Map of sessionKey -> AIChatContent DOM node (preserved across tab switches)
+  const chatContentMapRef = useRef<Map<string, AIChatContent>>(new Map());
+  // The currently visible AIChatContent instance
   const [chatContent, setChatContent] = useState<AIChatContent | null>(null);
   const [chatToolbar, setChatToolbar] = useState<AIChatToolbar | null>(null);
   const [chatTabs, setChatTabs] = useState<AIChatTabs | null>(null);
@@ -107,9 +109,6 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatToolbarContainerRef = useRef<HTMLDivElement | null>(null);
   const chatTabsContainerRef = useRef<HTMLDivElement | null>(null);
-  const contentKeyRef = useRef<string | null>(null);
-  const prevSessionIdRef = useRef<string | null>(null);
-  const prevSessionDocIdRef = useRef<string | null>(null);
   const lastDocIdRef = useRef<string | null>(null);
   const sessionLoadSeqRef = useRef(0);
   const userIdRef = useRef<string | null | undefined>(undefined);
@@ -120,43 +119,71 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
 
   const agentRuntime = useService(AgentRuntimeService);
   const featureFlags = useService(FeatureFlagService).flags;
+  const enableAgentRuntime = featureFlags.enable_agent_runtime.value;
 
-  // User input in chat for potential agent job use
-  const [currentAgentJobInput, setCurrentAgentJobInput] = useState('');
+  /**
+   * Background chat send handler.
+   * When `enable_agent_runtime` is on, intercepts every chat send and routes
+   * it through AgentRuntimeService as a `background_chat` job so the stream
+   * continues even when the user navigates away from the chat panel.
+   */
+  const handleSendMessage = useCallback(
+    async (userInput: string) => {
+      if (!doc || !workspaceId) return;
+      // Use the active visible content
+      const activeContent = chatContent;
+      if (!activeContent) return;
 
-  // Handler for when user sends a chat message (stores input for agent jobs)
-  const handleAgentJobInputChange = useCallback((input: string) => {
-    setCurrentAgentJobInput(input);
-  }, []);
+      // Get or create a session — mirrors what send() does internally.
+      let sessionId = activeContent.session?.sessionId;
+      if (!sessionId) {
+        try {
+          const newSession = await activeContent.createSession();
+          sessionId = newSession?.sessionId;
+        } catch (err) {
+          console.error(
+            '[AgentRuntime] handleSendMessage: createSession failed',
+            err
+          );
+          return;
+        }
+        if (!sessionId) {
+          console.warn(
+            '[AgentRuntime] handleSendMessage: could not obtain sessionId, skipping'
+          );
+          return;
+        }
+      }
 
-  const runDemoAgent = useCallback(() => {
-    if (!doc || !workspaceId) return;
+      const context = createAgentContextSnapshot({
+        workspaceId,
+        docId: doc.id,
+        docTitle: doc.meta?.title || 'Untitled',
+        viewMode: 'page',
+      });
 
-    // Build combined prompt including markdown context if available
-    const userPrompt = chatContent?.chatContextValue.markdown
-      ? `Context from page:\n${chatContent.chatContextValue.markdown}\n\nUser request: ${currentAgentJobInput}`
-      : currentAgentJobInput ||
-        'Create a summary document from the current page';
+      const modelId = framework.get(AIModelService).modelId.value;
 
-    const context = createAgentContextSnapshot({
-      workspaceId,
-      docId: doc.id,
-      docTitle: doc.meta?.title || 'Untitled',
-      viewMode: 'page',
-    });
-
-    agentRuntime.enqueue({
-      workspaceId,
-      title: userPrompt.slice(0, 60),
-      userPrompt,
-      context,
-      priority: 'high',
-      workflow: 'llm_planner',
-    });
-
-    // Clear stored input after enqueuing
-    setCurrentAgentJobInput('');
-  }, [doc, workspaceId, agentRuntime, currentAgentJobInput, chatContent]);
+      agentRuntime.enqueue({
+        workspaceId,
+        title: userInput.slice(0, 60),
+        userPrompt: userInput,
+        context,
+        priority: 'high',
+        workflow: 'background_chat',
+        chatOptions: {
+          sessionId,
+          userInput,
+          docId: doc.id,
+          isRootSession: true,
+          reasoning: reasoningConfig.enabled.value,
+          modelId: modelId ?? undefined,
+          toolsConfig: activeContent.aiToolsConfigService.config.value,
+        },
+      });
+    },
+    [agentRuntime, chatContent, doc, framework, reasoningConfig, workspaceId]
+  );
 
   const [sessionServiceReady, setSessionServiceReady] = useState(
     () => !!AIProvider.session
@@ -216,6 +243,10 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     setSession(undefined);
     setEmbeddingProgress([0, 0]);
     setHasPinned(false);
+    // Hide all cached content nodes when resetting
+    chatContentMapRef.current.forEach(node => {
+      node.style.display = 'none';
+    });
   }, []);
 
   const initPanel = useCallback(async () => {
@@ -377,6 +408,14 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
 
   const closeTab = useCallback(
     (sessionId: string) => {
+      // Remove and destroy the cached AIChatContent node for the closed tab.
+      const cached = chatContentMapRef.current.get(sessionId);
+      if (cached) {
+        cached.remove();
+        chatContentMapRef.current.delete(sessionId);
+        if (chatContent === cached) setChatContent(null);
+      }
+
       let fallback: CopilotChatHistoryFragment | undefined;
       setOpenTabs(prev => {
         const idx = prev.findIndex(tab => tab.sessionId === sessionId);
@@ -392,7 +431,7 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
         newSession().catch(console.error);
       }
     },
-    [newSession, openSession, session?.sessionId, setOpenTabs]
+    [chatContent, newSession, openSession, session?.sessionId, setOpenTabs]
   );
 
   const togglePin = useCallback(async () => {
@@ -439,14 +478,10 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     [rebindSession]
   );
 
+  // When session resets to undefined (loading/resetting), tear down toolbar+tabs only.
+  // chatContent nodes are cached in chatContentMapRef and kept alive.
   useEffect(() => {
-    if (session !== undefined) {
-      return;
-    }
-    if (chatContent) {
-      chatContent.remove();
-      setChatContent(null);
-    }
+    if (session !== undefined) return;
     if (chatToolbar) {
       chatToolbar.remove();
       setChatToolbar(null);
@@ -455,7 +490,7 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
       chatTabs.remove();
       setChatTabs(null);
     }
-  }, [chatContent, chatTabs, chatToolbar, session]);
+  }, [chatTabs, chatToolbar, session]);
 
   useEffect(() => {
     if (!session?.sessionId) return;
@@ -531,47 +566,32 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     return () => subscription.unsubscribe();
   }, [doc, initPanel, session]);
 
-  const contentKey = getChatContentKey({
-    docId: doc?.id,
-    hasPinned,
-    previousSessionDocId: prevSessionDocIdRef.current,
-    previousSessionId: prevSessionIdRef.current,
-    session,
-  });
+  // Derive a stable key for the cache: prefer sessionId, fallback to docId.
+  // This replaces the old contentKey / prevSession logic.
+  const sessionCacheKey = session?.sessionId ?? doc?.id ?? 'chat-panel';
 
+  // Show/hide cached AIChatContent nodes; create on first visit for each session.
   useEffect(() => {
-    if (session?.sessionId) {
-      prevSessionIdRef.current = session.sessionId;
-      prevSessionDocIdRef.current = session.docId ?? doc?.id ?? null;
-    }
-  }, [doc?.id, session?.docId, session?.sessionId]);
+    if (!isBodyProvided || !chatContainerRef.current || !doc || !host) return;
+    if (session === undefined) return;
 
-  useEffect(() => {
-    if (!chatContent) {
-      contentKeyRef.current = contentKey;
-      return;
-    }
-    if (contentKeyRef.current && contentKeyRef.current !== contentKey) {
-      chatContent.remove();
-      setChatContent(null);
-    }
-    contentKeyRef.current = contentKey;
-  }, [chatContent, contentKey]);
+    const map = chatContentMapRef.current;
+    const container = chatContainerRef.current;
 
-  useEffect(() => {
-    if (!isBodyProvided || !chatContainerRef.current || !doc || !host) {
-      return;
-    }
-    if (session === undefined) {
-      return;
-    }
+    // Hide all currently visible nodes.
+    map.forEach(node => {
+      node.style.display = 'none';
+    });
 
-    let content = chatContent;
-
+    // Get or create the node for the active session key.
+    let content = map.get(sessionCacheKey) ?? null;
     if (!content) {
       content = new AIChatContent();
+      map.set(sessionCacheKey, content);
     }
 
+    // Always update mutable props BEFORE appending (connectedCallback fires on first append).
+    content.style.display = '';
     content.host = host;
     content.session = session;
     content.createSession = createSession;
@@ -594,7 +614,8 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     content.subscriptionService = framework.get(SubscriptionService);
     content.aiModelService = framework.get(AIModelService);
     content.onAISubscribe = handleAISubscribe;
-    content.onRunAgentJob = handleAgentJobInputChange;
+    content.onRunAgentJob = undefined;
+    content.onSendMessage = enableAgentRuntime ? handleSendMessage : undefined;
     content.onEmbeddingProgressChange = onEmbeddingProgressChange;
     content.onContextChange = onContextChange;
     content.width = sidebarWidthSignal;
@@ -602,19 +623,31 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
       openDoc(docId, sessionId).catch(console.error);
     };
 
-    if (!chatContent) {
-      chatContainerRef.current.append(content);
-      setChatContent(content);
+    // Re-attach any detached cached nodes to the (possibly new) container,
+    // then append the active one if it is not yet in the DOM.
+    map.forEach((node, key) => {
+      if (node.parentElement !== container) {
+        node.style.display = 'none';
+        container.append(node);
+      }
+      if (key !== sessionCacheKey) {
+        node.style.display = 'none';
+      }
+    });
+    if (content.parentElement !== container) {
+      container.append(content);
       onLoad?.(content);
     }
+
+    setChatContent(content);
   }, [
-    chatContent,
     createSession,
     doc,
     docDisplayConfig,
+    enableAgentRuntime,
     framework,
     handleAISubscribe,
-    handleAgentJobInputChange,
+    handleSendMessage,
     host,
     isBodyProvided,
     notificationService,
@@ -625,6 +658,7 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
     reasoningConfig,
     searchMenuConfig,
     session,
+    sessionCacheKey,
     sidebarWidthSignal,
     specs,
   ]);
@@ -725,6 +759,30 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
 
     return () => disposable.forEach(item => item?.unsubscribe());
   }, [chatContent, editor]);
+
+  // Reload history when a background_chat job for the current session completes.
+  useEffect(() => {
+    if (!chatContent || !enableAgentRuntime) return;
+
+    const sub = agentRuntime.jobs$.subscribe(jobs => {
+      const sessionId = chatContent.session?.sessionId;
+      if (!sessionId) return;
+
+      const completedChatJob = jobs.find(
+        j =>
+          j.workflow === 'background_chat' &&
+          j.status === 'succeeded' &&
+          (j.chatOptions as { sessionId?: string } | undefined)?.sessionId ===
+            sessionId
+      );
+      if (completedChatJob) {
+        // Reload history to display the AI response that was saved by the server.
+        chatContent.updateHistory().catch(console.error);
+      }
+    });
+
+    return () => sub.unsubscribe();
+  }, [agentRuntime.jobs$, chatContent, enableAgentRuntime]);
 
   const [autoResized, setAutoResized] = useState(false);
   useEffect(() => {
@@ -842,23 +900,6 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
             {playgroundVisible && !featureFlags.enable_agent_runtime.$ ? (
               <div className={styles.playground} onClick={openPlayground}>
                 <CenterPeekIcon />
-              </div>
-            ) : null}
-            {featureFlags.enable_agent_runtime.$ ? (
-              <div
-                className={styles.playground}
-                onClick={runDemoAgent}
-                title="Run as Agent Job"
-                style={{
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  padding: '0 8px',
-                  border: '1px solid var(--affine-border-color)',
-                  borderRadius: 4,
-                  background: 'var(--affine-hover-color)',
-                }}
-              >
-                Run Agent Job
               </div>
             ) : null}
             <div

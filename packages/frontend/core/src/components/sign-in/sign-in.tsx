@@ -92,21 +92,13 @@ export const SignInStep = ({
     try {
       const { hasPassword } = await authService.checkUserByEmail(email);
 
-      if (hasPassword) {
-        changeState(prev => ({
-          ...prev,
-          email,
-          step: 'signInWithPassword',
-          hasPassword: true,
-        }));
-      } else {
-        changeState(prev => ({
-          ...prev,
-          email,
-          step: 'signInWithEmail',
-          hasPassword: false,
-        }));
-      }
+      // Magic-link / OTP email flow is disabled. Always use password sign-in.
+      changeState(prev => ({
+        ...prev,
+        email,
+        step: 'signInWithPassword',
+        hasPassword,
+      }));
     } catch (err: any) {
       console.error(err);
 

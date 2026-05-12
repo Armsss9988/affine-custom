@@ -18,7 +18,8 @@ export type AgentWorkflowKind =
   | 'create_doc_from_prompt'
   | 'append_to_current_doc'
   | 'approval_demo'
-  | 'llm_planner';
+  | 'llm_planner'
+  | 'background_chat';
 
 export function isActiveJobStatus(status: AgentJobStatus): boolean {
   return ['queued', 'planning', 'running', 'waiting_approval'].includes(status);
@@ -128,6 +129,25 @@ export interface AgentJob {
   updatedAt: string;
   startedAt?: string;
   completedAt?: string;
+  /** Only present for background_chat workflow */
+  chatOptions?: BackgroundChatOptions;
+}
+
+/**
+ * Chat-specific options for background_chat workflow.
+ * Carries all params needed to call AIProvider.actions.chat() from the service.
+ */
+export interface BackgroundChatOptions {
+  sessionId?: string;
+  docId?: string;
+  userInput: string;
+  modelId?: string;
+  reasoning?: boolean;
+  docs?: unknown[];
+  files?: unknown[];
+  attachments?: string[];
+  toolsConfig?: unknown;
+  isRootSession?: boolean;
 }
 
 export interface EnqueueAgentJobInput {
@@ -137,4 +157,6 @@ export interface EnqueueAgentJobInput {
   context: import('./agent-context').AgentContextSnapshot;
   workflow?: AgentWorkflowKind;
   priority?: AgentJobPriority;
+  /** Only required when workflow === 'background_chat' */
+  chatOptions?: BackgroundChatOptions;
 }

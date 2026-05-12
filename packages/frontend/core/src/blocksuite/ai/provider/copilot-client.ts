@@ -492,11 +492,19 @@ export class CopilotClient {
       endpoint === Endpoint.Action
         ? `/api/copilot/actions/${sessionId}/stream`
         : `/api/copilot/chat/${sessionId}/${endpoint}`;
+
+    // webSearch is a top-level query param; strip it from toolsConfig before sending.
+    // Chat defaults to enabled unless the user explicitly disables it.
+    const { webSearch, ...restToolsConfig } = toolsConfig ?? {};
+    const hasRestConfig = Object.keys(restToolsConfig).length > 0;
+    const defaultWebSearch = endpoint === Endpoint.Action ? false : true;
+
     const queryString = this.paramsToQueryString({
       messageId,
       reasoning,
       modelId,
-      toolsConfig,
+      toolsConfig: hasRestConfig ? restToolsConfig : undefined,
+      webSearch: webSearch ?? defaultWebSearch,
       actionId,
       actionVersion,
       runId,

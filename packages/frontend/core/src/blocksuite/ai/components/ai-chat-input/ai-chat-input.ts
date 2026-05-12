@@ -425,6 +425,18 @@ export class AIChatInput extends SignalWatcher(
   accessor onChatSuccess: (() => void) | undefined;
 
   @property({ attribute: false })
+  accessor onRunAgentJob: ((input: string) => void) | undefined;
+
+  /**
+   * When set, replaces the default `send()` with an external handler.
+   * The handler receives the raw user input and is responsible for the
+   * full send lifecycle (e.g. enqueuing an AgentRuntimeService job).
+   * The chat input will clear itself before calling this callback.
+   */
+  @property({ attribute: false })
+  accessor onSendMessage: ((input: string) => void | Promise<void>) | undefined;
+
+  @property({ attribute: false })
   accessor trackOptions: BlockSuitePresets.TrackerOptions | undefined;
 
   @property({ attribute: 'data-testid', reflect: true })
@@ -813,6 +825,17 @@ export class AIChatInput extends SignalWatcher(
         input: '',
       });
     }
+
+    // If an external send handler is provided (e.g. to route to AgentRuntimeService),
+    // use it instead of the default send() so the stream lives outside this component.
+    if (this.onSendMessage) {
+      this.onSendMessage(value);
+      return;
+    }
+
+    // Notify parent when user sends a message (for agent job potential use)
+    this.onRunAgentJob?.(value);
+
     await this.send(value);
   };
 

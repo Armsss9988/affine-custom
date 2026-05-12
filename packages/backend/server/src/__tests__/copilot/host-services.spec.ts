@@ -38,6 +38,8 @@ import { ImageResultHost } from '../../plugins/copilot/runtime/hosts/image-resul
 import { ResponsePostprocessor } from '../../plugins/copilot/runtime/hosts/response-postprocessor';
 import { TurnPersistence } from '../../plugins/copilot/runtime/hosts/turn-persistence';
 import { ToolRuntime } from '../../plugins/copilot/runtime/tool-runtime';
+import { ChatQuerySchema } from '../../plugins/copilot/types';
+import { getTools } from '../../plugins/copilot/utils';
 
 function stubTurnPersistence(
   persistProjectedResult: Sinon.SinonStub = Sinon.stub().resolves(null)
@@ -357,6 +359,29 @@ test('ConversationHost should replay durable tokens without rechecking quota', a
   Sinon.assert.notCalled(resolveTurnRouteAccess);
 });
 
+test('ChatQuerySchema should accept legacy web search flag in toolsConfig', t => {
+  const query = ChatQuerySchema.parse({
+    toolsConfig: JSON.stringify({
+      searchWorkspace: true,
+      webSearch: true,
+    }),
+  });
+
+  t.true(query.webSearch);
+  t.deepEqual(query.toolsConfig, {
+    searchWorkspace: true,
+    webSearch: true,
+  });
+});
+
+test('getTools should remove web search when toolsConfig disables it', t => {
+  const tools = getTools(['docRead', 'webSearch'], {
+    webSearch: false,
+  });
+
+  t.deepEqual(tools, ['docRead']);
+});
+
 test('ToolRuntime should pass route context into prompt-backed tools', async t => {
   const promptRuntime = {
     runText: Sinon.stub().resolves('<html><body>done</body></html>'),
@@ -526,6 +551,34 @@ for (const exaKey of ['', 'YOUR_EXA_API_KEY']) {
     t.false('web_crawl_exa' in tools);
   });
 }
+
+test('ToolRuntime should expose Exa web tools when key is configured', async t => {
+  const runtime = new ToolRuntime(
+    {
+      copilot: { exa: { key: 'exa_test_key' } },
+      indexer: { enabled: false },
+    } as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any
+  );
+
+  const tools = await runtime.getTools(
+    {
+      tools: ['webSearch'],
+      user: 'user-1',
+      workspace: 'workspace-1',
+    },
+    'gpt-4o-mini'
+  );
+
+  t.true('web_search_exa' in tools);
+  t.true('web_crawl_exa' in tools);
+});
 
 test('ResponsePostprocessor should build text, object and image assistant turns', t => {
   const postprocessor = new ResponsePostprocessor();

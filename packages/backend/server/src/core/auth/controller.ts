@@ -127,12 +127,9 @@ export class AuthController {
         credential.password
       );
     } else {
-      await this.sendMagicLink(
-        res,
-        credential.email,
-        credential.callbackUrl,
-        credential.client_nonce
-      );
+      // Magic-link / OTP email flow is disabled in this build.
+      // Users must sign in with a password.
+      throw new WrongSignInCredentials({ email: credential.email });
     }
   }
 

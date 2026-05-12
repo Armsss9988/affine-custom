@@ -12,6 +12,7 @@ const AI_TOOLS_CONFIG_KEY = 'AIToolsConfig';
 export interface AIToolsConfig {
   searchWorkspace?: boolean;
   readingDocs?: boolean;
+  webSearch?: boolean;
 }
 
 export class AIToolsConfigService extends Service {
@@ -22,6 +23,7 @@ export class AIToolsConfigService extends Service {
       createSignalFromObservable<AIToolsConfig>(this.config$, {
         searchWorkspace: true,
         readingDocs: true,
+        webSearch: true,
       });
     this.config = signal;
     this.disposables.push(enabledCleanup);
@@ -38,6 +40,7 @@ export class AIToolsConfigService extends Service {
     map(config => ({
       searchWorkspace: config?.searchWorkspace ?? true,
       readingDocs: config?.readingDocs ?? true,
+      webSearch: config?.webSearch ?? true,
     }))
   );
 

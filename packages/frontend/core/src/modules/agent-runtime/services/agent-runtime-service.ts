@@ -100,7 +100,7 @@ function getErrorCode(error: unknown): AgentErrorCode {
  */
 export class AgentRuntimeService extends Service {
   private readonly jobMap = new Map<string, AgentJob>();
-  private readonly queue = new InMemoryJobQueue(1);
+  private readonly queue = new InMemoryJobQueue(8);
   private readonly approvalResolvers = new Map<
     string,
     { jobId: string; resolve: (decision: ApprovalDecision) => void }
@@ -149,6 +149,7 @@ export class AgentRuntimeService extends Service {
       approvals: [],
       createdAt: now,
       updatedAt: now,
+      chatOptions: input.chatOptions,
     };
 
     this.jobMap.set(job.id, job);
@@ -521,6 +522,19 @@ export class AgentRuntimeService extends Service {
             action: prompt || 'Run approval-protected action',
           }),
         ];
+      case 'background_chat': {
+        if (!job.chatOptions) {
+          throw new Error('background_chat job is missing chatOptions');
+        }
+        return [
+          createStep(
+            job.id,
+            'Sending chat in background',
+            'affine.background_chat',
+            job.chatOptions
+          ),
+        ];
+      }
       default:
         return [];
     }
