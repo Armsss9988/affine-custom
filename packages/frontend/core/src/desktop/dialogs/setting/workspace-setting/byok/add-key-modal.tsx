@@ -54,6 +54,7 @@ export const AddKeyModal = ({
   const [storage, setStorage] = useState<ByokStorage>(ByokKeyStorage.server);
   const [apiKey, setApiKey] = useState('');
   const [endpoint, setEndpoint] = useState('');
+  const [model, setModel] = useState('');
   const [testResult, setTestResult] = useState<ByokTestResult | null>(null);
   const [testing, setTesting] = useState(false);
   const canTestStoredConfig =
@@ -75,6 +76,7 @@ export const AddKeyModal = ({
     );
     setApiKey('');
     setEndpoint(editingKey?.endpoint ?? '');
+    setModel(editingKey?.model ?? '');
     setTestResult(null);
   }, [canAddServerKey, editingKey, open]);
 
@@ -93,6 +95,7 @@ export const AddKeyModal = ({
             storage,
             apiKey: apiKey || null,
             endpoint: endpoint || null,
+            model: model || null,
             configId: canTestStoredConfig ? editingKey.id : null,
           },
         },
@@ -137,6 +140,7 @@ export const AddKeyModal = ({
         description,
         apiKey,
         endpoint: endpoint || null,
+        model: model || null,
         sortOrder:
           editingKey?.storage === ByokKeyStorage.local
             ? editingKey.sortOrder
@@ -167,6 +171,7 @@ export const AddKeyModal = ({
             storage,
             apiKey: apiKey || null,
             endpoint: endpoint || null,
+            model: model || null,
             enabled: true,
           },
         },
@@ -276,7 +281,7 @@ export const AddKeyModal = ({
             type="password"
           />
         </label>
-        {settings.customEndpointSupported ? (
+        {(provider === ByokProvider.openai_compatible || settings.customEndpointSupported) ? (
           <label className={styles.field}>
             <span className={styles.label}>{byokT(t, 'field.endpoint')}</span>
             <input
@@ -290,6 +295,20 @@ export const AddKeyModal = ({
             />
           </label>
         ) : null}
+        {provider === ByokProvider.openai_compatible && (
+          <label className={styles.field}>
+            <span className={styles.label}>{byokT(t, 'field.model')}</span>
+            <input
+              className={styles.input}
+              value={model}
+              onChange={event => {
+                setModel(event.target.value);
+                setTestResult(null);
+              }}
+              placeholder="e.g., google/gemini-2.0-flash-001"
+            />
+          </label>
+        )}
         <div className={styles.modalActions}>
           <span
             className={`${styles.testStatus} ${

@@ -30,6 +30,7 @@ function toLocalByokKey(key: LocalByokPublicKey): ByokKey {
     configured: key.configured ?? true,
     enabled: key.enabled ?? true,
     endpoint: key.endpoint ?? null,
+    model: key.model ?? null,
     endpointEditable: key.endpointEditable ?? false,
     sortOrder: key.sortOrder ?? 0,
     capabilities: capabilitiesFor(key.provider, ByokKeyStorage.local),

@@ -38,6 +38,7 @@ export type LocalByokKeyInput = Pick<
   | 'name'
   | 'description'
   | 'endpoint'
+  | 'model'
   | 'sortOrder'
   | 'enabled'
 > & {
@@ -85,6 +86,7 @@ export type LocalByokPublicKey = {
   description?: string | null;
   endpoint?: string | null;
   endpointEditable?: boolean;
+  model?: string | null;
   sortOrder?: number | null;
   enabled?: boolean | null;
   configured?: boolean;
