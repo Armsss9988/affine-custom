@@ -11,6 +11,7 @@ export type UpsertAiWorkspaceByokConfigInput = {
   description: string | null;
   encryptedApiKey?: string;
   endpoint: string | null;
+  model?: string | null;
   sortOrder: number;
   enabled: boolean;
   userId?: string;
@@ -45,6 +46,7 @@ export class CopilotWorkspaceByokConfigModel extends BaseModel {
       name: input.name,
       description: input.description,
       endpoint: input.endpoint,
+      model: input.model ?? null,
       sortOrder: input.sortOrder,
       enabled: input.enabled,
       updatedBy: input.userId,

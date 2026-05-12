@@ -742,6 +742,7 @@ model AiWorkspaceByokConfig {
   description         String?   @db.VarChar
   encryptedApiKey     String    @map("encrypted_api_key") @db.Text
   endpoint            String?   @db.Text
+  model               String?   @db.VarChar
   sortOrder           Int       @default(0) @map("sort_order")
   enabled             Boolean   @default(true)
   disabledReason      String?   @map("disabled_reason") @db.VarChar
