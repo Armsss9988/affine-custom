@@ -148,8 +148,10 @@ export class ChatInputPreference extends SignalWatcher(
     const modelItems = [];
     const searchItems = [];
 
-    // model switch
-    const serverModelItems = this.aiModelService.models.value.map(model => {
+    // model switch — skip pro/pro-preview models
+    const serverModelItems = this.aiModelService.models.value
+      .filter(model => !model.isPro)
+      .map(model => {
       const isSelected = model.id === this.model.value?.id;
       const isSelfHosted =
         this.serverService.server.config$.value?.type ===
@@ -200,7 +202,9 @@ export class ChatInputPreference extends SignalWatcher(
     });
 
     const allModelGroups = [
-      menu.group({ items: serverModelItems }),
+      ...(serverModelItems.length > 0
+        ? [menu.group({ items: serverModelItems })]
+        : []),
       ...(byokModelItems.length > 0
         ? [menu.group({ items: byokModelItems })]
         : []),
