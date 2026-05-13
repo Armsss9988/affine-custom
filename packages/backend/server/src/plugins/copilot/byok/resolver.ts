@@ -213,6 +213,9 @@ class TestWorkspaceByokConfigInput {
   @Field(() => String, { nullable: true })
   endpoint?: string | null;
 
+  @Field(() => String, { nullable: true })
+  model?: string | null;
+
   @Field(() => ID, { nullable: true })
   configId?: string | null;
 }
