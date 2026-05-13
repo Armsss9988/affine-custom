@@ -127,12 +127,12 @@ export class ChatInputPreference extends SignalWatcher(
 
   model = computed(() => {
     const modelId = this.aiModelService.modelId.value;
-    const activeModel = this.aiModelService.models.value.find(
-      model => model.id === modelId
-    );
-    const defaultModel = this.aiModelService.models.value.find(
-      model => model.isDefault
-    );
+    const allModels = [
+      ...this.aiModelService.models.value,
+      ...this.aiModelService.byokModels.value,
+    ];
+    const activeModel = allModels.find(model => model.id === modelId);
+    const defaultModel = allModels.find(model => model.isDefault);
     return activeModel || defaultModel;
   });
 
@@ -143,6 +143,63 @@ export class ChatInputPreference extends SignalWatcher(
     const searchItems = [];
 
     // model switch
+    const serverModelItems = this.aiModelService.models.value.map(model => {
+      const isSelected = model.id === this.model.value?.id;
+      const isSelfHosted =
+        this.serverService.server.config$.value?.type ===
+        ServerDeploymentType.Selfhosted;
+      const status =
+        this.subscriptionService.subscription.ai$.value?.status;
+      const isSubscribed = status === SubscriptionStatus.Active;
+      return menu.action({
+        name: model.category,
+        info: html`
+          <span class="ai-model-version">${model.version}</span>
+        `,
+        prefix: html`
+          <div class="ai-model-prefix">
+            ${isSelected ? DoneIcon() : undefined}
+          </div>
+        `,
+        postfix: html`
+          <div class="ai-model-postfix" @click=${this.onAISubscribe}>
+            ${model.isPro && !isSubscribed ? LockIcon() : undefined}
+          </div>
+        `,
+        select: () => {
+          if (model.isPro && !isSelfHosted && !isSubscribed) {
+            this.notificationService.toast(
+              `Pro models require an AFFiNE AI subscription.`
+            );
+            return;
+          }
+          this.aiModelService.setModel(model.id);
+        },
+      });
+    });
+
+    const byokModelItems = this.aiModelService.byokModels.value.map(model => {
+      const isSelected = model.id === this.model.value?.id;
+      return menu.action({
+        name: model.category,
+        prefix: html`
+          <div class="ai-model-prefix">
+            ${isSelected ? DoneIcon() : undefined}
+          </div>
+        `,
+        select: () => {
+          this.aiModelService.setModel(model.id);
+        },
+      });
+    });
+
+    const allModelGroups = [
+      menu.group({ items: serverModelItems }),
+      ...(byokModelItems.length > 0
+        ? [menu.group({ items: byokModelItems })]
+        : []),
+    ];
+
     modelItems.push(
       menu.subMenu({
         name: 'Model',
@@ -152,40 +209,7 @@ export class ChatInputPreference extends SignalWatcher(
           <span class="ai-active-model-name"> ${this.model.value?.name} </span>
         `,
         options: {
-          items: this.aiModelService.models.value.map(model => {
-            const isSelected = model.id === this.model.value?.id;
-            const isSelfHosted =
-              this.serverService.server.config$.value?.type ===
-              ServerDeploymentType.Selfhosted;
-            const status =
-              this.subscriptionService.subscription.ai$.value?.status;
-            const isSubscribed = status === SubscriptionStatus.Active;
-            return menu.action({
-              name: model.category,
-              info: html`
-                <span class="ai-model-version">${model.version}</span>
-              `,
-              prefix: html`
-                <div class="ai-model-prefix">
-                  ${isSelected ? DoneIcon() : undefined}
-                </div>
-              `,
-              postfix: html`
-                <div class="ai-model-postfix" @click=${this.onAISubscribe}>
-                  ${model.isPro && !isSubscribed ? LockIcon() : undefined}
-                </div>
-              `,
-              select: () => {
-                if (model.isPro && !isSelfHosted && !isSubscribed) {
-                  this.notificationService.toast(
-                    `Pro models require an AFFiNE AI subscription.`
-                  );
-                  return;
-                }
-                this.aiModelService.setModel(model.id);
-              },
-            });
-          }),
+          items: allModelGroups,
         },
       })
     );

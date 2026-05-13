@@ -1,4 +1,8 @@
-import { getPromptModelsQuery, SubscriptionStatus } from '@affine/graphql';
+import {
+  getPromptModelsQuery,
+  SubscriptionStatus,
+  workspaceByokSettingsQuery,
+} from '@affine/graphql';
 import {
   createSignalFromObservable,
   type Signal,
@@ -7,6 +11,7 @@ import { signal } from '@preact/signals-core';
 import { LiveData, Service } from '@toeverything/infra';
 
 import type { GraphQLService, SubscriptionService } from '../../cloud';
+import type { WorkspaceService } from '../../workspace';
 import type { GlobalStateService } from '../../storage';
 
 const AI_MODEL_ID_KEY = 'AIModelId';
@@ -24,6 +29,7 @@ export class AIModelService extends Service {
   modelId: Signal<string | undefined>;
 
   models: Signal<AIModel[]> = signal([]);
+  byokModels: Signal<AIModel[]> = signal([]);
 
   private readonly modelId$ = LiveData.from(
     this.globalStateService.globalState.watch<string>(AI_MODEL_ID_KEY),
@@ -33,7 +39,8 @@ export class AIModelService extends Service {
   constructor(
     private readonly globalStateService: GlobalStateService,
     private readonly gqlService: GraphQLService,
-    private readonly subscriptionService: SubscriptionService
+    private readonly subscriptionService: SubscriptionService,
+    private readonly workspaceService: WorkspaceService
   ) {
     super();
 
@@ -65,6 +72,7 @@ export class AIModelService extends Service {
 
   private readonly init = async () => {
     await this.initModels();
+    await this.initByokModels();
 
     // subscribe to ai purchase status
     const sub = this.subscriptionService.subscription.ai$.subscribe(
@@ -79,6 +87,35 @@ export class AIModelService extends Service {
       }
     );
     this.disposables.push(() => sub.unsubscribe());
+  };
+
+  private readonly initByokModels = async () => {
+    const workspaceId = this.workspaceService.workspace.id;
+    if (!workspaceId) return;
+    try {
+      const res = await this.gqlService.gql({
+        query: workspaceByokSettingsQuery,
+        variables: {
+          id: workspaceId,
+          from: new Date().toISOString(),
+          to: new Date().toISOString(),
+        },
+      });
+      const keys = res.workspace?.byokSettings?.keys ?? [];
+      const byokModels = keys
+        .filter(key => key.enabled && key.model && key.provider === 'openai_compatible')
+        .map(key => ({
+          name: key.model!,
+          id: key.model!,
+          version: '',
+          category: key.model!,
+          isPro: false,
+          isDefault: false,
+        }));
+      this.byokModels.value = byokModels;
+    } catch (err) {
+      console.error('Failed to fetch BYOK models', err);
+    }
   };
 
   private readonly initModels = async (prompt?: string) => {
