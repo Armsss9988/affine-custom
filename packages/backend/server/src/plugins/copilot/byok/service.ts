@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 import { BadRequest, Cache, CryptoHelper, metrics } from '../../../base';
 import { Models } from '../../../models';
@@ -105,6 +105,8 @@ type ByokProfileMeta = {
 
 @Injectable()
 export class ByokService {
+  private readonly logger = new Logger(ByokService.name);
+
   constructor(
     private readonly models: Models,
     private readonly crypto: CryptoHelper,
@@ -778,11 +780,15 @@ export class ByokService {
     const timeout = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
     try {
       const request = this.buildProbeRequest(provider, apiKey, endpoint);
+      this.logger.log(`Probing provider ${provider} at ${request.url}`);
       const response = await fetch(request.url, {
         method: request.method,
         headers: request.headers as unknown as Record<string, string>,
         signal: controller.signal,
       });
+      this.logger.log(
+        `Probe ${provider} responded with status ${response.status}`
+      );
       if (!response.ok) {
         throw new BadRequestException(
           this.providerProbeFailureMessage(response.status)
@@ -835,6 +841,12 @@ export class ByokService {
       return 'Provider key test timed out.';
     }
     if (error instanceof BadRequestException && error.message) {
+      return error.message.slice(0, 300);
+    }
+    if (error instanceof TypeError) {
+      return `Network error: ${error.message}`;
+    }
+    if (error instanceof Error && error.message) {
       return error.message.slice(0, 300);
     }
     return 'Provider request failed.';
