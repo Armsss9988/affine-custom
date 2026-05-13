@@ -13,15 +13,16 @@ export function disposeWorkspaceByokStorage() {
   byokStorage.dispose();
 }
 
-const allowedProviders = new Set(['openai', 'anthropic', 'gemini', 'fal']);
+const allowedProviders = new Set(['openai', 'anthropic', 'gemini', 'fal', 'openai_compatible']);
 
 type WorkspaceByokKey = {
   id: string;
-  provider: 'openai' | 'anthropic' | 'gemini' | 'fal';
+  provider: 'openai' | 'anthropic' | 'gemini' | 'fal' | 'openai_compatible';
   name: string;
   description?: string | null;
   apiKey: string;
   endpoint?: string | null;
+  model?: string | null;
   sortOrder?: number | null;
   enabled?: boolean | null;
 };
@@ -66,6 +67,9 @@ function normalizeKey(
     endpoint: hasOwnField(key, 'endpoint')
       ? (key.endpoint ?? null)
       : (existing?.endpoint ?? null),
+    model: hasOwnField(key, 'model')
+      ? (key.model ?? null)
+      : (existing?.model ?? null),
     sortOrder: hasOwnField(key, 'sortOrder')
       ? (key.sortOrder ?? defaultSortOrder)
       : (existing?.sortOrder ?? defaultSortOrder),
