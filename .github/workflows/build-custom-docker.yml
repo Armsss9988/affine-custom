@@ -33,4 +33,4 @@ jobs:
     with:
       build-type: ${{ inputs.build-type || 'stable' }}
       app-version: ${{ inputs.app-version || '0.26.3' }}
-      git-short-hash: ${{ inputs.git-short-hash || github.sha }}
+      git-short-hash: ${{ inputs.git-short-hash || 'custom' }}
