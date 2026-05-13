@@ -1,6 +1,10 @@
-name: Build Custom Image Manually
+name: Build Custom Image
 
 on:
+  push:
+    branches:
+      - main
+      - master
   workflow_dispatch:
     inputs:
       build-type:
@@ -27,6 +31,6 @@ jobs:
     uses: ./.github/workflows/build-images.yml
     secrets: inherit
     with:
-      build-type: ${{ inputs.build-type }}
-      app-version: ${{ inputs.app-version }}
-      git-short-hash: ${{ inputs.git-short-hash }}
+      build-type: ${{ inputs.build-type || 'stable' }}
+      app-version: ${{ inputs.app-version || '0.26.3' }}
+      git-short-hash: ${{ inputs.git-short-hash || github.sha }}
