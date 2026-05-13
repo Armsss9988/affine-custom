@@ -1,11 +1,19 @@
 import { Injectable } from '@nestjs/common';
 
 import { ActionForbidden } from '../../../base';
+import { ServerFeature, ServerService } from '../../../core/config';
 import { Models, WorkspaceRole } from '../../../models';
 
 @Injectable()
 export class ByokEntitlementPolicy {
-  constructor(private readonly models: Models) {}
+  constructor(
+    private readonly models: Models,
+    private readonly server: ServerService
+  ) {}
+
+  private get entitlementDisabled() {
+    return !this.server.features.includes(ServerFeature.Payment);
+  }
 
   private isUserPlanEntitled(features: string[]) {
     return (
@@ -57,7 +65,7 @@ export class ByokEntitlementPolicy {
   }
 
   async hasLocalEntitlement(workspaceId: string, userId?: string) {
-    if (env.selfhosted) return true;
+    if (this.entitlementDisabled) return true;
 
     if (await this.models.workspaceFeature.has(workspaceId, 'team_plan_v1')) {
       return true;
@@ -71,7 +79,7 @@ export class ByokEntitlementPolicy {
   }
 
   async hasServerEntitlement(workspaceId: string) {
-    if (env.selfhosted) return true;
+    if (this.entitlementDisabled) return true;
 
     if (await this.models.workspaceFeature.has(workspaceId, 'team_plan_v1')) {
       return true;
