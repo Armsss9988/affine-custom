@@ -11,7 +11,6 @@ import { signal } from '@preact/signals-core';
 import { LiveData, Service } from '@toeverything/infra';
 
 import type { GraphQLService, SubscriptionService } from '../../cloud';
-import type { WorkspaceService } from '../../workspace';
 import type { GlobalStateService } from '../../storage';
 
 const AI_MODEL_ID_KEY = 'AIModelId';
@@ -39,8 +38,7 @@ export class AIModelService extends Service {
   constructor(
     private readonly globalStateService: GlobalStateService,
     private readonly gqlService: GraphQLService,
-    private readonly subscriptionService: SubscriptionService,
-    private readonly workspaceService: WorkspaceService
+    private readonly subscriptionService: SubscriptionService
   ) {
     super();
 
@@ -70,27 +68,7 @@ export class AIModelService extends Service {
     this.globalStateService.globalState.set(AI_MODEL_ID_KEY, modelId);
   };
 
-  private readonly init = async () => {
-    await this.initModels();
-    await this.initByokModels();
-
-    // subscribe to ai purchase status
-    const sub = this.subscriptionService.subscription.ai$.subscribe(
-      subscription => {
-        const isSubscribed = subscription?.status === SubscriptionStatus.Active;
-        const model = this.models.value.find(
-          model => model.id === this.modelId.value
-        );
-        if (!isSubscribed && model?.isPro) {
-          this.resetModel();
-        }
-      }
-    );
-    this.disposables.push(() => sub.unsubscribe());
-  };
-
-  private readonly initByokModels = async () => {
-    const workspaceId = this.workspaceService.workspace.id;
+  loadByokModels = async (workspaceId: string) => {
     if (!workspaceId) return;
     try {
       const res = await this.gqlService.gql({
@@ -116,6 +94,24 @@ export class AIModelService extends Service {
     } catch (err) {
       console.error('Failed to fetch BYOK models', err);
     }
+  };
+
+  private readonly init = async () => {
+    await this.initModels();
+
+    // subscribe to ai purchase status
+    const sub = this.subscriptionService.subscription.ai$.subscribe(
+      subscription => {
+        const isSubscribed = subscription?.status === SubscriptionStatus.Active;
+        const model = this.models.value.find(
+          model => model.id === this.modelId.value
+        );
+        if (!isSubscribed && model?.isPro) {
+          this.resetModel();
+        }
+      }
+    );
+    this.disposables.push(() => sub.unsubscribe());
   };
 
   private readonly initModels = async (prompt?: string) => {

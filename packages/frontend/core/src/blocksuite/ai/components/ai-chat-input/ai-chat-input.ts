@@ -642,6 +642,7 @@ export class AIChatInput extends SignalWatcher(
         <div class="chat-input-footer-spacer"></div>
         <chat-input-preference
           .session=${this.session}
+          .workspaceId=${this.workspaceId}
           .extendedThinking=${this._isReasoningActive}
           .onExtendedThinkingChange=${this._toggleReasoning}
           .serverService=${this.serverService}

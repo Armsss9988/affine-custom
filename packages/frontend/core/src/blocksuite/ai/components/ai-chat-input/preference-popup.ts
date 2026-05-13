@@ -95,6 +95,9 @@ export class ChatInputPreference extends SignalWatcher(
 
   @property({ attribute: false })
   accessor session!: CopilotChatHistoryFragment | null | undefined;
+
+  @property({ attribute: false })
+  accessor workspaceId!: string;
   // --------- model props end ---------
 
   // --------- extended thinking props start ---------
@@ -139,6 +142,9 @@ export class ChatInputPreference extends SignalWatcher(
   openPreference(e: Event) {
     const element = e.currentTarget;
     if (!(element instanceof HTMLElement)) return;
+
+    this.aiModelService.loadByokModels(this.workspaceId);
+
     const modelItems = [];
     const searchItems = [];
 
