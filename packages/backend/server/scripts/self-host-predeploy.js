@@ -68,7 +68,7 @@ function runDataMigrations() {
   console.log('running data migrations.');
   execSync('node ./dist/main.js run', {
     encoding: 'utf-8',
-    env: process.env,
+    env: { ...process.env, SERVER_FLAVOR: 'script' },
     stdio: 'inherit',
   });
 }
