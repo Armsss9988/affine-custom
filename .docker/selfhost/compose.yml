@@ -22,6 +22,7 @@ services:
     env_file:
       - .env
     environment:
+      - NODE_ENV=production
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
       - AFFINE_INDEXER_ENABLED=false
@@ -79,6 +80,7 @@ services:
     env_file:
       - .env
     environment:
+      - NODE_ENV=production
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
       - AFFINE_INDEXER_ENABLED=false

@@ -20,5 +20,8 @@ Thumbs.db
 *.swp
 *.swo
 
+# Secrets
+private.key
+
 # Dependencies
 node_modules/
