@@ -29,6 +29,8 @@ function toGraphqlByokProvider(provider: string): ByokProvider | null {
       return ByokProvider.anthropic;
     case ByokProvider.gemini:
       return ByokProvider.gemini;
+    case 'openai_compatible':
+      return ByokProvider.openai_compatible;
     case ByokProvider.fal:
       return ByokProvider.fal;
     default:
@@ -75,6 +77,7 @@ async function createWorkspaceByokLocalLease(
               description: provider.description ?? null,
               apiKey: provider.apiKey,
               endpoint: provider.endpoint ?? null,
+              model: provider.model ?? null,
               sortOrder: provider.sortOrder ?? 0,
               enabled: provider.enabled ?? true,
             },
