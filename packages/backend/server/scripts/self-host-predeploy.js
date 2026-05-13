@@ -53,12 +53,15 @@ function repairPgvectorEmbeddingTables() {
     path.join(import.meta.dirname, 'repair-pgvector-embedding-tables.sql'),
     'utf-8'
   );
-  execSync('node node_modules/.bin/prisma db execute --stdin --schema schema.prisma', {
-    encoding: 'utf-8',
-    env: process.env,
-    input: sql,
-    stdio: ['pipe', 'inherit', 'inherit'],
-  });
+  execSync(
+    'node node_modules/.bin/prisma db execute --stdin --schema schema.prisma',
+    {
+      encoding: 'utf-8',
+      env: process.env,
+      input: sql,
+      stdio: ['pipe', 'inherit', 'inherit'],
+    }
+  );
 }
 
 function runDataMigrations() {
@@ -77,11 +80,14 @@ function fixFailedMigrations() {
   ];
   for (const migration of maybeFailedMigrations) {
     try {
-      execSync(`node node_modules/.bin/prisma migrate resolve --rolled-back ${migration}`, {
-        encoding: 'utf-8',
-        env: process.env,
-        stdio: 'pipe',
-      });
+      execSync(
+        `node node_modules/.bin/prisma migrate resolve --rolled-back ${migration}`,
+        {
+          encoding: 'utf-8',
+          env: process.env,
+          stdio: 'pipe',
+        }
+      );
       console.log(`migration [${migration}] has been rolled back.`);
     } catch (err) {
       if (
