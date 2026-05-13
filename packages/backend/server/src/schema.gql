@@ -760,6 +760,7 @@ input CreateWorkspaceByokLocalLeaseProviderInput {
   description: String
   enabled: Boolean
   endpoint: String
+  model: String
   name: String!
   provider: ByokProvider!
   sortOrder: SafeInt
@@ -2393,6 +2394,7 @@ input TestWorkspaceByokConfigInput {
   apiKey: String
   configId: ID
   endpoint: String
+  model: String
   provider: ByokProvider!
   storage: ByokKeyStorage!
   workspaceId: String!
@@ -2567,6 +2569,7 @@ input UpsertWorkspaceByokConfigInput {
   enabled: Boolean
   endpoint: String
   id: ID
+  model: String
   name: String!
   provider: ByokProvider!
   sortOrder: SafeInt
@@ -2697,6 +2700,7 @@ type WorkspaceByokKeyConfigType {
   lastTestError: String
   lastTestedAt: DateTime
   lastUsedAt: DateTime
+  model: String
   name: String!
   provider: ByokProvider!
   sortOrder: SafeInt!
