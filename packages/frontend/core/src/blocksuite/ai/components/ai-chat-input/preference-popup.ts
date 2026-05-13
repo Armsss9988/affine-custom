@@ -139,11 +139,11 @@ export class ChatInputPreference extends SignalWatcher(
     return activeModel || defaultModel;
   });
 
-  openPreference(e: Event) {
+  async openPreference(e: Event) {
     const element = e.currentTarget;
     if (!(element instanceof HTMLElement)) return;
 
-    this.aiModelService.loadByokModels(this.workspaceId);
+    await this.aiModelService.loadByokModels(this.workspaceId);
 
     const modelItems = [];
     const searchItems = [];
