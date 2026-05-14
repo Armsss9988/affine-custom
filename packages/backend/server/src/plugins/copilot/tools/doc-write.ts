@@ -224,10 +224,13 @@ export const buildKanbanHandler = (
       );
     }
 
-    await ac
-      .user(options.user)
-      .workspace(options.workspace)
-      .assert('Workspace.CreateDoc');
+    // Skip permission check in selfhosted mode (local workspaces may not be synced)
+    if (!env.selfhosted) {
+      await ac
+        .user(options.user)
+        .workspace(options.workspace)
+        .assert('Workspace.CreateDoc');
+    }
 
     const sanitizedTitle = title.replace(/[\r\n]+/g, ' ').trim();
     if (!sanitizedTitle) {
