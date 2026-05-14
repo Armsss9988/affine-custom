@@ -20,6 +20,7 @@ import {
   buildDocSearchGetter,
   buildDocUpdateHandler,
   buildDocUpdateMetaHandler,
+  buildKanbanHandler,
   type CopilotTool,
   type CopilotToolSet,
   createBlobReadTool,
@@ -33,6 +34,7 @@ import {
   createDocUpdateMetaTool,
   createDocUpdateTool,
   createExaCrawlTool,
+  createKanbanTool,
   createExaSearchTool,
   createSectionEditTool,
   getConfiguredExaKey,
@@ -212,6 +214,14 @@ export class ToolRuntime {
         }
         case 'sectionEdit': {
           tools.section_edit = createSectionEditTool(runPromptText);
+          break;
+        }
+        case 'kanbanCreate': {
+          if (!(env.dev || env.namespaces.canary)) {
+            continue;
+          }
+          const createKanban = buildKanbanHandler(this.ac, this.docWriter);
+          tools.kanban_create = createKanbanTool(createKanban.bind(null, options));
           break;
         }
       }
