@@ -79,7 +79,7 @@ export function getTools(
         }
         break;
       case 'webSearch':
-        if (value === false) {
+        if (value === false || !process.env.AFFINE_EXA_API_KEY?.trim()) {
           result = result.filter(tool => {
             return tool !== 'webSearch';
           });
