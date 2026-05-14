@@ -205,3 +205,112 @@ export const createDocUpdateMetaTool = (
     },
   });
 };
+
+export const buildKanbanHandler = (
+  ac: AccessController,
+  writer: DocWriter
+) => {
+  return async (
+    options: CopilotChatOptions,
+    title: string,
+    columns: { name: string; type: string; options?: string[] },
+    statuses: string[],
+    cards: { title: string; status?: string }[]
+  ) => {
+    if (!options?.user || !options.workspace) {
+      return toolError(
+        'Kanban Create Failed',
+        'Missing user or workspace context'
+      );
+    }
+
+    await ac
+      .user(options.user)
+      .workspace(options.workspace)
+      .assert('Workspace.CreateDoc');
+
+    const sanitizedTitle = title.replace(/[\r\n]+/g, ' ').trim();
+    if (!sanitizedTitle) {
+      return toolError('Kanban Create Failed', 'Title cannot be empty');
+    }
+
+    const result = await writer.createDocWithKanban(
+      options.workspace,
+      sanitizedTitle,
+      columns.map(c => ({
+        name: c.name,
+        type: c.type as any || 'rich-text',
+        options: c.options,
+      })),
+      statuses,
+      cards.map(c => ({
+        title: (c.title || '').replace(/[\r\n]+/g, ' ').trim() || c.title,
+        status: c.status,
+      })),
+      options.user
+    );
+
+    return {
+      success: true,
+      docId: result.docId,
+      databaseId: result.databaseId,
+      message: `Kanban board "${sanitizedTitle}" created successfully`,
+    };
+  };
+};
+
+export const createKanbanTool = (
+  createKanban: (
+    title: string,
+    columns: { name: string; type: string; options?: string[] }[],
+    statuses: string[],
+    cards: { title: string; status?: string }[]
+  ) => Promise<object>
+) => {
+  return defineTool({
+    description:
+      'Create a new document containing a Kanban board (database block with Kanban view). ' +
+      'Users can specify columns, status groups for the Kanban lanes, and cards/tasks. ' +
+      'The board is grouped by the Status column by default.',
+    inputSchema: z.object({
+      title: z.string().min(1).describe('The title of the Kanban board document'),
+      columns: z
+        .array(
+          z.object({
+            name: z.string().describe('Column display name (e.g. "Status", "Assignee")'),
+            type: z
+              .enum(['title', 'select', 'number', 'rich-text'])
+              .default('rich-text')
+              .describe('Column data type'),
+            options: z
+              .array(z.string())
+              .optional()
+              .describe('Options for select-type columns'),
+          })
+        )
+        .default([{ name: 'Status', type: 'select' }])
+        .describe('Column definitions for the board'),
+      statuses: z
+        .array(z.string())
+        .default(['To Do', 'In Progress', 'Done'])
+        .describe('Status groups for the Kanban lanes'),
+      cards: z
+        .array(
+          z.object({
+            title: z.string().describe('Card title'),
+            status: z.string().optional().describe('Status group this card belongs to'),
+          })
+        )
+        .default([])
+        .describe('Cards to add to the board'),
+    }),
+    execute: async ({ title, columns, statuses, cards }) => {
+      try {
+        return await createKanban(title, columns, statuses, cards);
+      } catch (err: any) {
+        logger.error(`Failed to create kanban board: ${title}`, err);
+        return toolError('Kanban Create Failed', err.message);
+      }
+    },
+  });
+};
