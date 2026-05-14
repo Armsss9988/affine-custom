@@ -322,7 +322,13 @@ export class ByokService {
       ) {
         throw new BadRequestException('BYOK config not found.');
       }
-      apiKey = this.crypto.decrypt(config.encryptedApiKey);
+      try {
+        apiKey = this.crypto.decrypt(config.encryptedApiKey);
+      } catch {
+        throw new BadRequestException(
+          'Failed to decrypt API key. The encryption key may have changed.'
+        );
+      }
       endpoint =
         input.endpoint !== undefined
           ? endpoint
@@ -604,7 +610,15 @@ export class ByokService {
     encryptedApiKey: string,
     endpoint: string | null
   ) {
-    const apiKey = this.crypto.decrypt(encryptedApiKey);
+    let apiKey: string;
+    try {
+      apiKey = this.crypto.decrypt(encryptedApiKey);
+    } catch {
+      this.logger.warn(
+        `Failed to decrypt API key for BYOK provider ${provider}, skipping.`
+      );
+      return { apiKey: '' };
+    }
     switch (provider) {
       case ByokProvider.openai:
       case ByokProvider.openai_compatible:
