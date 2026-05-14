@@ -92,6 +92,8 @@ export const PromptToolsSchema = z
     'docCompose',
     // section editing
     'sectionEdit',
+    // kanban board creation
+    'kanbanCreate',
   ])
   .array();
 
