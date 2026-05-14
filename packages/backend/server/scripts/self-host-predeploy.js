@@ -40,11 +40,14 @@ function prepare() {
 
 function runPrismaMigrations() {
   console.log('running prisma migrations.');
-  execSync('node node_modules/.bin/prisma migrate deploy', {
-    encoding: 'utf-8',
-    env: process.env,
-    stdio: 'inherit',
-  });
+  execSync(
+    'node node_modules/.bin/prisma db push --accept-data-loss --skip-generate',
+    {
+      encoding: 'utf-8',
+      env: process.env,
+      stdio: 'inherit',
+    }
+  );
 }
 
 function repairPgvectorEmbeddingTables() {
@@ -113,7 +116,6 @@ function fixFailedMigrations() {
 }
 
 prepare();
-fixFailedMigrations();
 runPrismaMigrations();
 repairPgvectorEmbeddingTables();
 runDataMigrations();
