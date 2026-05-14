@@ -217,9 +217,6 @@ export class ToolRuntime {
           break;
         }
         case 'kanbanCreate': {
-          if (!(env.dev || env.namespaces.canary)) {
-            continue;
-          }
           const createKanban = buildKanbanHandler(this.ac, this.docWriter);
           tools.kanban_create = createKanbanTool(createKanban.bind(null, options));
           break;
