@@ -309,7 +309,12 @@ export const createKanbanTool = (
     }),
     execute: async ({ title, columns, statuses, cards }) => {
       try {
-        return await createKanban(title, columns, statuses, cards);
+        return await createKanban(
+          title,
+          columns ?? [{ name: 'Status', type: 'select' }],
+          statuses ?? ['To Do', 'In Progress', 'Done'],
+          cards ?? []
+        );
       } catch (err: any) {
         logger.error(`Failed to create kanban board: ${title}`, err);
         return toolError('Kanban Create Failed', err.message);
