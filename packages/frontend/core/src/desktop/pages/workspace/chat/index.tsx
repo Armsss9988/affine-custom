@@ -331,6 +331,15 @@ export const Component = () => {
     const container = chatContainerRef.current;
     const sessionKey = currentSession?.sessionId ?? 'new';
 
+    // Transfer 'new' cached node to real session key on first session creation.
+    // Prevents creating a brand new AIChatContent when session transitions from
+    // null -> real, which would discard the optimistic message already being streamed.
+    if (sessionKey !== 'new' && map.has('new')) {
+      const node = map.get('new')!;
+      map.delete('new');
+      map.set(sessionKey, node);
+    }
+
     // Hide all existing nodes.
     map.forEach(node => {
       node.style.display = 'none';
