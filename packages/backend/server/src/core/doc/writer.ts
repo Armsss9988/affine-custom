@@ -326,13 +326,11 @@ export class DocWriter {
     editorId?: string
   ): Promise<CreateDocWithKanbanResult> {
     const rootDoc = await this.storage.getDoc(workspaceId, workspaceId);
-    if (!rootDoc?.bin) {
-      throw new NotFoundException(`Workspace ${workspaceId} not found`);
-    }
-
-    const rootDocBin = Buffer.isBuffer(rootDoc.bin)
-      ? rootDoc.bin
-      : Buffer.from(rootDoc.bin.buffer, rootDoc.bin.byteOffset, rootDoc.bin.byteLength);
+    const rootDocBin = rootDoc?.bin
+      ? Buffer.isBuffer(rootDoc.bin)
+        ? rootDoc.bin
+        : Buffer.from(rootDoc.bin.buffer, rootDoc.bin.byteOffset, rootDoc.bin.byteLength)
+      : null;
 
     const docId = nanoid();
     const pageId = nanoid();
@@ -495,17 +493,17 @@ export class DocWriter {
     // Encode full Yjs binary
     const binary = Buffer.from(Y.encodeStateAsUpdate(ydoc));
 
-    // Register in root doc
-    const rootDocUpdate = addDocToRootDoc(rootDocBin, docId, title);
-
-    // Push root doc update
-    const rootTimestamp = await this.storage.pushDocUpdates(
-      workspaceId, workspaceId, [rootDocUpdate], editorId
-    );
-    this.emitDocUpdatesPushed({
-      spaceId: workspaceId, docId: workspaceId,
-      updates: [rootDocUpdate], timestamp: rootTimestamp, editor: editorId,
-    });
+    if (rootDocBin) {
+      // Register in root doc (server-synced workspace)
+      const rootDocUpdate = addDocToRootDoc(rootDocBin, docId, title);
+      const rootTimestamp = await this.storage.pushDocUpdates(
+        workspaceId, workspaceId, [rootDocUpdate], editorId
+      );
+      this.emitDocUpdatesPushed({
+        spaceId: workspaceId, docId: workspaceId,
+        updates: [rootDocUpdate], timestamp: rootTimestamp, editor: editorId,
+      });
+    }
 
     // Push new doc binary
     const docTimestamp = await this.storage.pushDocUpdates(
@@ -516,11 +514,13 @@ export class DocWriter {
       updates: [binary], timestamp: docTimestamp, editor: editorId,
     });
 
-    await this.updateDocProperties(
-      workspaceId, docId,
-      { createdBy: editorId, updatedBy: editorId },
-      editorId
-    );
+    if (rootDocBin) {
+      await this.updateDocProperties(
+        workspaceId, docId,
+        { createdBy: editorId, updatedBy: editorId },
+        editorId
+      );
+    }
 
     this.logger.log(`Created kanban doc ${docId} (database ${databaseId})`);
     return { docId, databaseId };
