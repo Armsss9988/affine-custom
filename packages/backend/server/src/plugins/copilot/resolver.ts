@@ -69,7 +69,7 @@ class CreateChatSessionInput {
 @InputType()
 class UpdateChatSessionInput implements Omit<
   UpdateChatSession,
-  'userId' | 'title'
+  'userId'
 > {
   @Field(() => String)
   sessionId!: string;
@@ -91,6 +91,12 @@ class UpdateChatSessionInput implements Omit<
     nullable: true,
   })
   promptName!: string;
+
+  @Field(() => String, {
+    description: 'The title of the session',
+    nullable: true,
+  })
+  title!: string | null | undefined;
 }
 
 @InputType()

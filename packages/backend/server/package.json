@@ -144,6 +144,9 @@
   },
   "nodemonConfig": {
     "exec": "node",
+    "watch": [
+      "src"
+    ],
     "ignore": [
       "**/__tests__/**",
       "**/dist/**",

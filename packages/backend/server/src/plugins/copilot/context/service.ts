@@ -184,7 +184,7 @@ export class CopilotContextService implements OnApplicationBootstrap {
     content: string,
     topK: number = 5,
     signal?: AbortSignal,
-    threshold: number = 0.5,
+    threshold: number = 0.85,
     routeContext?: EmbeddingRouteContext
   ) {
     const client = this.embeddingClient;
@@ -209,7 +209,7 @@ export class CopilotContextService implements OnApplicationBootstrap {
     content: string,
     topK: number = 5,
     signal?: AbortSignal,
-    threshold: number = 0.5,
+    threshold: number = 0.85,
     routeContext?: EmbeddingRouteContext
   ) {
     const client = this.embeddingClient;
@@ -234,7 +234,7 @@ export class CopilotContextService implements OnApplicationBootstrap {
     content: string,
     topK: number = 5,
     signal?: AbortSignal,
-    threshold: number = 0.5,
+    threshold: number = 0.85,
     routeContext?: EmbeddingRouteContext
   ) {
     const client = this.embeddingClient;

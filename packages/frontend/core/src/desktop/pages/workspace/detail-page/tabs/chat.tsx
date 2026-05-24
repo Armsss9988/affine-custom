@@ -147,12 +147,16 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
           );
           return;
         }
-        if (!sessionId) {
-          console.warn(
-            '[AgentRuntime] handleSendMessage: could not obtain sessionId, skipping'
-          );
-          return;
-        }
+        // Immediately update session title with user input
+        const sessionTitle = userInput.slice(0, 50).trim() || 'Chat';
+        (AIProvider.session as any)
+          ?.updateSession({
+            sessionId,
+            title: sessionTitle,
+          })
+          .catch((err: any) => {
+            console.warn('[TitleUpdate] failed:', err);
+          });
       }
 
       const context = createAgentContextSnapshot({
@@ -577,6 +581,15 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
 
     const map = chatContentMapRef.current;
     const container = chatContainerRef.current;
+
+    // Transfer 'new' cached node (doc-keyed) to real session key on first
+    // session creation. Prevents discarding the optimistic message already
+    // being streamed when the session transitions from null -> real.
+    if (session && doc && sessionCacheKey !== doc.id && map.has(doc.id)) {
+      const node = map.get(doc.id)!;
+      map.delete(doc.id);
+      map.set(sessionCacheKey, node);
+    }
 
     // Hide all currently visible nodes.
     map.forEach(node => {

@@ -40,7 +40,7 @@ import {
   ViewTitle,
   WorkbenchService,
 } from '@affine/core/modules/workbench';
-import { WorkspaceService } from '@affine/core/modules/workspace';
+import { WorkspaceService, WorkspaceLocalState } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
 import { RefNodeSlotsProvider } from '@blocksuite/affine/inlines/reference';
 import { BlockStdScope } from '@blocksuite/affine/std';
@@ -52,11 +52,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   createSessionDeleteHandler,
-  useAIChatOpenTabs,
 } from '../chat-panel-utils';
 import * as styles from './index.css';
 
-type CopilotSession = Awaited<ReturnType<CopilotClient['getSession']>>;
+type CopilotSession = NonNullable<Awaited<ReturnType<CopilotClient['getSession']>>>;
+
+// Module-level caches so chat state survives route unmount/remount cycles.
+// Keyed by workspaceId to avoid cross-workspace conflicts.
+const _chatContentMaps = new Map<string, Map<string, AIChatContent>>();
+const _cachedSessions = new Map<string, CopilotSession | null>();
+const _cachedOpenTabs = new Map<string, CopilotSession[]>();
+const AI_CHAT_OPEN_TABS_KEY = 'aiChatOpenTabs';
 
 function useCopilotClient() {
   const graphqlService = useService(GraphQLService);
@@ -93,13 +99,18 @@ function useMockStd() {
 export const Component = () => {
   const t = useI18n();
   const framework = useFramework();
+  const workspaceId = useService(WorkspaceService).workspace.id;
+  const workspaceLocalState = useService(WorkspaceLocalState);
+  const client = useCopilotClient();
+  const workbench = useService(WorkbenchService).workbench;
+
   const [isBodyProvided, setIsBodyProvided] = useState(false);
   const [isHeaderProvided, setIsHeaderProvided] = useState(false);
   const [chatContent, setChatContent] = useState<AIChatContent | null>(null);
   const [chatTool, setChatTool] = useState<AIChatToolbar | null>(null);
   const [chatTabs, setChatTabs] = useState<AIChatTabs | null>(null);
   const [currentSession, setCurrentSession] = useState<CopilotSession | null>(
-    null
+    () => _cachedSessions.get(workspaceId) ?? null
   );
   const [status, setStatus] = useState<ChatStatus>('idle');
   const [isTogglingPin, setIsTogglingPin] = useState(false);
@@ -109,18 +120,83 @@ export const Component = () => {
   const chatToolContainerRef = useRef<HTMLDivElement>(null);
   const chatTabsContainerRef = useRef<HTMLDivElement | null>(null);
   const widthSignalRef = useRef<Signal<number>>(signal(0));
-  // Map of sessionId -> AIChatContent DOM node (preserved across tab switches)
-  const chatContentMapRef = useRef<Map<string, AIChatContent>>(new Map());
-  const client = useCopilotClient();
-  const workbench = useService(WorkbenchService).workbench;
 
-  const workspaceId = useService(WorkspaceService).workspace.id;
+  // Map of sessionId -> AIChatContent DOM node (preserved across route switches).
+  // Uses a workspace-scoped map from the module-level cache so nodes survive
+  // component unmount/remount within the same workspace session.
+  const getWorkspaceMap = useCallback(() => {
+    let map = _chatContentMaps.get(workspaceId);
+    if (!map) {
+      map = new Map();
+      _chatContentMaps.set(workspaceId, map);
+    }
+    return map;
+  }, [workspaceId]);
+
+  const chatContentMapRef = useRef<Map<string, AIChatContent>>(getWorkspaceMap());
+
+  useEffect(() => {
+    chatContentMapRef.current = getWorkspaceMap();
+  }, [getWorkspaceMap]);
+
+  // Sync currentSession to module-level cache so it survives route unmount/remount.
+  useEffect(() => {
+    _cachedSessions.set(workspaceId, currentSession);
+  }, [currentSession, workspaceId]);
 
   const loadSession = useCallback(
     (sessionId: string) => client.getSession(workspaceId, sessionId),
     [client, workspaceId]
   );
-  const { openTabs, setOpenTabs } = useAIChatOpenTabs(loadSession);
+
+  const [openTabs, setOpenTabsState] = useState<CopilotSession[]>(() => {
+    return _cachedOpenTabs.get(workspaceId) ?? [];
+  });
+
+  // Hydrate openTabs from localState on mount if not already in memory cache
+  useEffect(() => {
+    if (_cachedOpenTabs.has(workspaceId)) return;
+
+    const ids = workspaceLocalState.get<string[]>(AI_CHAT_OPEN_TABS_KEY) ?? [];
+    if (!ids.length) return;
+
+    let cancelled = false;
+    Promise.all(ids.map(id => loadSession(id).catch(() => null)))
+      .then(results => {
+        if (cancelled) return;
+        const valid = (results as (CopilotSession | null | undefined)[]).filter(
+          (entry): entry is CopilotSession => !!entry && !!entry.sessionId
+        );
+        if (valid.length) {
+          setOpenTabsState(valid);
+          _cachedOpenTabs.set(workspaceId, valid);
+        }
+      })
+      .catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSession, workspaceId, workspaceLocalState]);
+
+  const setOpenTabs = useCallback(
+    (updater: React.SetStateAction<CopilotSession[]>) => {
+      setOpenTabsState(prev => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        _cachedOpenTabs.set(workspaceId, next);
+        if (next.length) {
+          workspaceLocalState.set(
+            AI_CHAT_OPEN_TABS_KEY,
+            next.map(tab => tab.sessionId)
+          );
+        } else {
+          workspaceLocalState.del(AI_CHAT_OPEN_TABS_KEY);
+        }
+        return next;
+      });
+    },
+    [workspaceId, workspaceLocalState]
+  );
 
   useEffect(() => {
     hasRestoredPinnedSessionRef.current = false;
@@ -163,7 +239,7 @@ export const Component = () => {
           workspaceId,
           currentSession.sessionId
         );
-        setCurrentSession(session);
+        setCurrentSession(session ?? null);
       }
     } finally {
       setIsTogglingPin(false);
@@ -198,7 +274,27 @@ export const Component = () => {
 
   const onOpenSession = useCallback(
     async (sessionId: string) => {
-      if (isOpeningSession || currentSession?.sessionId === sessionId) return;
+      if (currentSession?.sessionId === sessionId) return;
+
+      // Look for the session in openTabs first
+      const existing = openTabs.find(tab => tab.sessionId === sessionId);
+      if (existing) {
+        hideCachedContent();
+        setCurrentSession(existing);
+        chatTool?.closeHistoryMenu();
+        // Fetch the latest from the server in the background to update it
+        client.getSession(workspaceId, sessionId)
+          .then(latestSession => {
+            if (latestSession) {
+              setOpenTabs(prev => prev.map(t => t.sessionId === sessionId ? latestSession : t));
+              setCurrentSession(prev => prev?.sessionId === sessionId ? latestSession : prev);
+            }
+          })
+          .catch(console.error);
+        return;
+      }
+
+      if (isOpeningSession) return;
       setIsOpeningSession(true);
       try {
         const session = await client.getSession(workspaceId, sessionId);
@@ -222,6 +318,7 @@ export const Component = () => {
       currentSession?.sessionId,
       hideCachedContent,
       isOpeningSession,
+      openTabs,
       setOpenTabs,
       workspaceId,
     ]
@@ -261,9 +358,77 @@ export const Component = () => {
     ]
   );
 
-  const onContextChange = useCallback((context: Partial<ChatContextValue>) => {
-    setStatus(context.status ?? 'idle');
-  }, []);
+  const currentSessionRef = useRef<CopilotSession | null>(null);
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
+
+  const openTabsRef = useRef<CopilotSession[]>([]);
+  useEffect(() => {
+    openTabsRef.current = openTabs;
+  }, [openTabs]);
+
+  const onSessionContextChange = useCallback(
+    (sessionKey: string, context: Partial<ChatContextValue>) => {
+      // 1. Only update the top-level toolbar status if this belongs to the active session
+      const activeSessionKey = currentSessionRef.current?.sessionId ?? 'new';
+      if (sessionKey === activeSessionKey) {
+        if (context.status !== undefined) {
+          setStatus(context.status);
+        }
+      }
+
+      // 2. Handle instant tab title generation on the first user message
+      if (context.messages && context.messages.length > 0) {
+        const firstUserMsg = (context.messages as any[]).find(m => m.role === 'user');
+        if (firstUserMsg && (firstUserMsg as any).content) {
+          const currentSessionForTab = openTabsRef.current.find(
+            t => t.sessionId === sessionKey
+          );
+          const hasNoTitle =
+            !currentSessionForTab?.title ||
+            currentSessionForTab.title === 'New chat' ||
+            currentSessionForTab.title === 'Chat With AFFiNE AI';
+
+          if (hasNoTitle && sessionKey !== 'new') {
+            const raw = (firstUserMsg as any).content.trim();
+            const newlineIdx = raw.indexOf('\n');
+            let newTitle = newlineIdx === -1 ? raw : raw.slice(0, newlineIdx);
+            newTitle = newTitle.slice(0, 30).trim(); // Truncate to reasonable length
+
+            if (newTitle) {
+              // Update currentSession and openTabs locally
+              setCurrentSession(prev => {
+                if (prev && prev.sessionId === sessionKey) {
+                  return { ...prev, title: newTitle };
+                }
+                return prev;
+              });
+              setOpenTabs(prev =>
+                prev.map(t => {
+                  if (t.sessionId === sessionKey) {
+                    return { ...t, title: newTitle };
+                  }
+                  return t;
+                })
+              );
+
+              // Update the title in backend DB via GQL updateSession mutation
+              client
+                .updateSession({
+                  sessionId: sessionKey,
+                  title: newTitle,
+                })
+                .catch(err => {
+                  console.error('Failed to save session title to server:', err);
+                });
+            }
+          }
+        }
+      }
+    },
+    [client, setOpenTabs]
+  );
 
   const onOpenDoc = useCallback(
     (docId: string) => {
@@ -363,7 +528,9 @@ export const Component = () => {
     content.docDisplayConfig = docDisplayConfig;
     content.searchMenuConfig = searchMenuConfig;
     content.reasoningConfig = reasoningConfig;
-    content.onContextChange = onContextChange;
+    content.onContextChange = (context) => {
+      onSessionContextChange(sessionKey, context);
+    };
     content.affineFeatureFlagService = framework.get(FeatureFlagService);
     content.affineWorkspaceDialogService = framework.get(
       WorkspaceDialogService
@@ -395,6 +562,8 @@ export const Component = () => {
     }
 
     setChatContent(content);
+    // Sync the top-level status state with the active tab's current status when swapping tabs
+    setStatus(content.chatContextValue?.status ?? 'idle');
   }, [
     createSession,
     currentSession,
@@ -405,7 +574,7 @@ export const Component = () => {
     reasoningConfig,
     searchMenuConfig,
     workspaceId,
-    onContextChange,
+    onSessionContextChange,
     notificationService,
     specs,
     onOpenDoc,
@@ -500,7 +669,7 @@ export const Component = () => {
       chatTabsContainerRef.current.append(tabs);
       setChatTabs(tabs);
     }
-    tabs.sessions = openTabs;
+    tabs.sessions = openTabs as any;
     tabs.activeSessionId = currentSession?.sessionId;
     tabs.onSelectTab = (sessionId: string) => {
       onOpenSession(sessionId).catch(console.error);
@@ -510,13 +679,38 @@ export const Component = () => {
     };
   }, [chatTabs, closeTab, currentSession?.sessionId, onOpenSession, openTabs]);
 
-  // restore pinned session
+  // restore pinned session or last active session from sessionStorage
   useEffect(() => {
     if (hasRestoredPinnedSessionRef.current || currentSession) return;
     hasRestoredPinnedSessionRef.current = true;
 
     const controller = new AbortController();
-    const loadPinnedSession = async () => {
+
+    const restore = async () => {
+      // Try sessionStorage first (persists across page navigations)
+      try {
+        const savedId = sessionStorage.getItem('affine_last_chat_session');
+        if (savedId) {
+          const session = await client.getSession(workspaceId, savedId);
+          if (!controller.signal.aborted) {
+            if (session) {
+              let shouldRemount = false;
+              setCurrentSession(prev => {
+                if (prev) return prev;
+                shouldRemount = true;
+                return session;
+              });
+              if (shouldRemount) hideCachedContent();
+              return;
+            }
+            // Saved session not found on server, clean up
+            sessionStorage.removeItem('affine_last_chat_session');
+          }
+        }
+      } catch {}
+
+      // Fall back to pinned sessions
+      if (controller.signal.aborted) return;
       try {
         const sessions = await client.getSessions(
           workspaceId,
@@ -547,16 +741,25 @@ export const Component = () => {
         console.error(error);
       }
     };
-    loadPinnedSession().catch(error => {
+
+    restore().catch(error => {
       if (controller.signal.aborted) return;
       console.error(error);
     });
 
-    // abort the request
     return () => {
       controller.abort();
     };
   }, [client, currentSession, hideCachedContent, workspaceId]);
+
+  // Save last active session ID to sessionStorage for persistence across navigations
+  useEffect(() => {
+    if (currentSession?.sessionId) {
+      try {
+        sessionStorage.setItem('affine_last_chat_session', currentSession.sessionId);
+      } catch {}
+    }
+  }, [currentSession?.sessionId]);
 
   const onChatContainerRef = useCallback((node: HTMLDivElement) => {
     if (node) {

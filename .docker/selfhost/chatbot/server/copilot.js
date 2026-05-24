@@ -597,7 +597,7 @@ router.post('/models/:modelName\\:batchEmbedContents', async (req, res) => {
     console.log(`[Copilot Gemini Embed] ${requestId} completed ${embeddings.length} embeddings`);
   } catch (err) {
     console.error(`[Copilot Gemini Embed] ${requestId} Error:`, err.message);
-    res.status(500).json({ error: { message: err.message } });
+    if (!res.headersSent) { res.status(500).json({ error: { message: err.message } }); }
   }
 });
 
@@ -827,7 +827,7 @@ router.post('/models/:modelName\\::action', async (req, res) => {
     }
   } catch (err) {
     console.error('[Copilot Gemini Proxy] Error:', err.message);
-    res.status(500).json({ error: { message: err.message } });
+    if (!res.headersSent) { res.status(500).json({ error: { message: err.message } }); }
   }
 });
 

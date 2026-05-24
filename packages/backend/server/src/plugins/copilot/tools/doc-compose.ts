@@ -31,8 +31,7 @@ export const createDocComposeTool = (prompt: RunPromptText) => {
       try {
         const content = await prompt(
           'Write an article about this',
-          {},
-          { appendMessages: [{ role: 'user', content: userPrompt }] }
+          { content: userPrompt }
         );
 
         return {

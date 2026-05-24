@@ -285,7 +285,7 @@ export class ContextSession implements AsyncDisposable {
     topK: number = 5,
     signal?: AbortSignal,
     scopedThreshold: number = 0.85,
-    threshold: number = 0.5,
+    threshold: number = 0.85,
     routeContext?: EmbeddingRouteContext
   ): Promise<FileChunkSimilarity[]> {
     if (!this.client) return [];
@@ -340,7 +340,7 @@ export class ContextSession implements AsyncDisposable {
     topK: number = 5,
     signal?: AbortSignal,
     scopedThreshold: number = 0.85,
-    threshold: number = 0.5,
+    threshold: number = 0.85,
     routeContext?: EmbeddingRouteContext
   ) {
     if (!this.client) return [];

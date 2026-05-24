@@ -178,7 +178,7 @@ class ProductionEmbeddingClient extends EmbeddingClient {
       const highConfidenceChunks = ranks
         .flat()
         .toSorted((a, b) => b.score - a.score)
-        .filter(r => r.score > 0.5)
+        .filter(r => r.score > 0)
         .map(r => chunks[`${r.targetId}:${r.chunk}`])
         .filter(Boolean);
 

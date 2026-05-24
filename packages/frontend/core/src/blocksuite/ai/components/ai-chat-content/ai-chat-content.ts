@@ -319,7 +319,11 @@ export class AIChatContent extends SignalWatcher(
     await this.aiDraftService.setDraft(draft);
   };
 
+  private _initialized = false;
+
   private readonly initChatContent = async () => {
+    if (this._initialized) return;
+    this._initialized = true;
     this.isHistoryLoading = true;
     await this.updateHistory();
     this.isHistoryLoading = false;
@@ -376,18 +380,20 @@ export class AIChatContent extends SignalWatcher(
   override connectedCallback() {
     super.connectedCallback();
 
-    this.initChatContent().catch(console.error);
+    if (!this._initialized) {
+      this.initChatContent().catch(console.error);
 
-    if (this.aiDraftService) {
-      this.aiDraftService
-        .getDraft()
-        .then(draft => {
-          this.chatContextValue = {
-            ...this.chatContextValue,
-            ...draft,
-          };
-        })
-        .catch(console.error);
+      if (this.aiDraftService) {
+        this.aiDraftService
+          .getDraft()
+          .then(draft => {
+            this.chatContextValue = {
+              ...this.chatContextValue,
+              ...draft,
+            };
+          })
+          .catch(console.error);
+      }
     }
 
     // revalidate subscription to get the latest status

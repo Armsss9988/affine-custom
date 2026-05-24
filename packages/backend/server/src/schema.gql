@@ -2506,6 +2506,9 @@ input UpdateChatSessionInput {
   """The prompt name to use for the session"""
   promptName: String
   sessionId: String!
+
+  """The title of the session"""
+  title: String
 }
 
 input UpdateDocDefaultRoleInput {

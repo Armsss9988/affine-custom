@@ -3108,6 +3108,7 @@ export interface TestWorkspaceByokConfigInput {
   apiKey?: InputMaybe<Scalars['String']['input']>;
   configId?: InputMaybe<Scalars['ID']['input']>;
   endpoint?: InputMaybe<Scalars['String']['input']>;
+  model?: InputMaybe<Scalars['String']['input']>;
   provider: ByokProvider;
   storage: ByokKeyStorage;
   workspaceId: Scalars['String']['input'];
@@ -3234,6 +3235,8 @@ export interface UpdateChatSessionInput {
   /** The prompt name to use for the session */
   promptName?: InputMaybe<Scalars['String']['input']>;
   sessionId: Scalars['String']['input'];
+  /** The title of the session */
+  title?: InputMaybe<Scalars['String']['input']>;
 }
 
 export interface UpdateDocDefaultRoleInput {

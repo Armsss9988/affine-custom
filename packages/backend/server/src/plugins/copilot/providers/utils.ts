@@ -458,6 +458,16 @@ export async function getGoogleAuth(
   }
 
   async function generateAuthToken() {
+    if (typeof options.googleAuthOptions === 'string') {
+      return options.googleAuthOptions;
+    }
+    if (
+      options.googleAuthOptions &&
+      typeof options.googleAuthOptions === 'object' &&
+      'accessToken' in options.googleAuthOptions
+    ) {
+      return (options.googleAuthOptions as any).accessToken;
+    }
     if (!options.googleAuthOptions) {
       return undefined;
     }

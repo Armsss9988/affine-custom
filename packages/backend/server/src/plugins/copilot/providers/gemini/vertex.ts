@@ -10,7 +10,10 @@ export class GeminiVertexProvider extends GeminiProvider<GeminiVertexConfig> {
   override readonly type = CopilotProviderType.GeminiVertex;
   override configured(execution?: CopilotProviderExecution): boolean {
     const config = this.getConfig(execution);
-    return !!config.location && !!config.googleAuthOptions;
+    return (
+      !!config.location &&
+      (!!config.googleAuthOptions || typeof config.googleAuthOptions === 'string')
+    );
   }
   protected async resolveVertexAuth(execution?: CopilotProviderExecution) {
     return await getGoogleAuth(this.getConfig(execution), 'google');

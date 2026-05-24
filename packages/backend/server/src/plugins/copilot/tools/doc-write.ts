@@ -206,6 +206,10 @@ export const createDocUpdateMetaTool = (
   });
 };
 
+// Track recently created kanban boards within the same conversation to
+// prevent the LLM from creating multiple identical boards.
+const recentKanbanCreations = new Map<string, number>();
+
 export const buildKanbanHandler = (
   ac: AccessController,
   writer: DocWriter
@@ -236,6 +240,17 @@ export const buildKanbanHandler = (
     if (!sanitizedTitle) {
       return toolError('Kanban Create Failed', 'Title cannot be empty');
     }
+
+    // Dedup: if the same title was just created within 30s, return existing result.
+    const dedupKey = `${options.session}/${sanitizedTitle}`;
+    const existing = recentKanbanCreations.get(dedupKey);
+    if (existing && Date.now() - existing < 30_000) {
+      return {
+        success: true,
+        message: `Kanban board "${sanitizedTitle}" was already created.`,
+      };
+    }
+    recentKanbanCreations.set(dedupKey, Date.now());
 
     const result = await writer.createDocWithKanban(
       options.workspace,
@@ -309,11 +324,14 @@ export const createKanbanTool = (
     }),
     execute: async ({ title, columns, statuses, cards }) => {
       try {
+        const parsedColumns = typeof columns === 'string' ? JSON.parse(columns) : columns;
+        const parsedStatuses = typeof statuses === 'string' ? JSON.parse(statuses) : statuses;
+        const parsedCards = typeof cards === 'string' ? JSON.parse(cards) : cards;
         return await createKanban(
           title,
-          columns ?? [{ name: 'Status', type: 'select' }],
-          statuses ?? ['To Do', 'In Progress', 'Done'],
-          cards ?? []
+          parsedColumns ?? [{ name: 'Status', type: 'select' }],
+          parsedStatuses ?? ['To Do', 'In Progress', 'Done'],
+          parsedCards ?? []
         );
       } catch (err: any) {
         logger.error(`Failed to create kanban board: ${title}`, err);

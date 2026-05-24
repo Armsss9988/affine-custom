@@ -47,6 +47,10 @@ services:
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - CHATBOT_PORT=3099
+      - AFFINE_EMAIL=${AFFINE_EMAIL}
+      - AFFINE_PASSWORD=${AFFINE_PASSWORD}
+      - AFFINE_WORKSPACE_ID=${AFFINE_WORKSPACE_ID}
+      - CHATGPT_API_KEY=${CHATGPT_API_KEY}
     volumes:
       - ./chatbot:/app
       - /app/node_modules
