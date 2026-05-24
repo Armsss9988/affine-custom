@@ -76,6 +76,10 @@ export const SelectPage = memo(function SelectPage({
   const clearSelected = useCallback(() => {
     docExplorerContextValue.selectedDocIds$.next([]);
   }, [docExplorerContextValue.selectedDocIds$]);
+  const selectAll = useCallback(() => {
+    const allDocIds = groups.flatMap(group => group.items);
+    docExplorerContextValue.selectedDocIds$.next(allDocIds);
+  }, [groups, docExplorerContextValue.selectedDocIds$]);
 
   useEffect(() => {
     const ob = docExplorerContextValue.selectedDocIds$.subscribe(value => {
@@ -159,11 +163,13 @@ export const SelectPage = memo(function SelectPage({
       selectedCount={selectedDocIds.length}
       onSearch={setSearchText}
       onClear={clearSelected}
+      onSelectAll={selectAll}
       onCancel={onCancel}
       onConfirm={confirm}
       actions={buttons}
     >
       <div className={styles.pagesTab}>
+
         <div className={styles.pagesTabContent}>
           {header ?? (
             <div style={{ fontSize: 12, lineHeight: '20px', fontWeight: 600 }}>

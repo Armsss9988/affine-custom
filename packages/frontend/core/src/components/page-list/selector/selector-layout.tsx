@@ -10,6 +10,7 @@ export interface SelectorContentProps extends PropsWithChildren {
 
   onSearch?: (value: string) => void;
   onClear?: () => void;
+  onSelectAll?: () => void;
   onCancel?: () => void;
   onConfirm?: () => void;
 
@@ -29,6 +30,7 @@ export const SelectorLayout = ({
 
   onSearch,
   onClear,
+  onSelectAll,
   onCancel,
   onConfirm,
 
@@ -63,6 +65,15 @@ export const SelectorLayout = ({
             <span>{t['com.affine.selectPage.selected']()}</span>
             <span className={styles.selectedNum}>{selectedCount ?? 0}</span>
           </div>
+          {onSelectAll ? (
+            <Button
+              variant="plain"
+              className={styles.clearButton}
+              onClick={onSelectAll}
+            >
+              {t['com.affine.page.group-header.select-all']()}
+            </Button>
+          ) : null}
           <Button
             variant="plain"
             className={styles.clearButton}
@@ -97,3 +108,4 @@ export const SelectorLayout = ({
     </div>
   );
 };
+
