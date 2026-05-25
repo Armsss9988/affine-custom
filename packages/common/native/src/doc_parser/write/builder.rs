@@ -250,7 +250,7 @@ pub(super) fn apply_embed_iframe_block_props(
   Ok(())
 }
 
-pub(super) fn apply_table_block_props(block: &mut Map, rows: &[Vec<String>]) -> Result<(), ParseError> {
+pub(super) fn apply_table_block_props(doc: &Doc, block: &mut Map, rows: &[Vec<String>]) -> Result<(), ParseError> {
   clear_table_props(block);
 
   if rows.is_empty() {
@@ -274,7 +274,12 @@ pub(super) fn apply_table_block_props(block: &mut Map, rows: &[Vec<String>]) -> 
 
     for (col_idx, column_id) in column_ids.iter().enumerate() {
       let cell_text = row.get(col_idx).cloned().unwrap_or_default();
-      block.insert(table_cell_text_key(&row_id, column_id), Any::String(cell_text))?;
+      let key = table_cell_text_key(&row_id, column_id);
+      let mut text = doc.create_text()?;
+      block.insert(key, Value::Text(text.clone()))?;
+      if !cell_text.is_empty() {
+        text.apply_delta(&text_ops_from_plain(&cell_text))?;
+      }
     }
   }
 
@@ -358,7 +363,7 @@ pub(super) fn apply_block_spec(
         .table
         .as_ref()
         .ok_or_else(|| ParseError::ParserError("table spec missing".into()))?;
-      apply_table_block_props(block, &table.rows)?;
+      apply_table_block_props(doc, block, &table.rows)?;
     }
     _ => {
       let props = TextBlockProps {
