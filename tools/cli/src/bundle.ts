@@ -180,9 +180,7 @@ function getRspackBundleConfigs(pkg: Package): MultiRspackOptions {
     }
     case '@affine/server': {
       return [
-        createRspackNodeTargetConfig(pkg, pkg.srcPath.join('index.ts').value, {
-          forceExternal: ['@affine/server-native'],
-        }),
+        createRspackNodeTargetConfig(pkg, pkg.srcPath.join('index.ts').value),
       ] as MultiRspackOptions;
     }
     case '@affine/reader': {

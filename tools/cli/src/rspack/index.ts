@@ -689,7 +689,7 @@ export function createNodeTargetConfig(
           minimizerOptions: {
             ecma: 2020,
             compress: { unused: true },
-            mangle: { keep_classnames: true },
+            mangle: false,
           },
         }),
       ],
