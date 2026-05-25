@@ -210,7 +210,7 @@ const makers = [
       platforms: ['darwin', 'linux', 'win32'],
     },
   },
-  !process.env.SKIP_BUNDLE && {
+  !process.env.SKIP_BUNDLE && !process.env.SKIP_SQUIRREL && {
     name: '@electron-forge/maker-squirrel',
     config: {
       name: productName,
@@ -261,7 +261,7 @@ const makers = [
       },
     },
   },
-  !process.env.SKIP_BUNDLE && {
+  !process.env.SKIP_BUNDLE && !process.env.SKIP_FLATPAK && {
     name: '@electron-forge/maker-flatpak',
     platforms: ['linux'],
     /** @type {import('@electron-forge/maker-flatpak').MakerFlatpakConfig} */

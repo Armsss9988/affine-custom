@@ -25,7 +25,7 @@
     "dev:prod": "node ./scripts/dev.ts",
     "build": "cross-env NODE_ENV=production node ./scripts/build-layers.ts",
     "build:dev": "node ./scripts/build-layers.ts",
-    "generate-assets": "node ./scripts/generate-assets.ts",
+    "generate-assets": "npx tsx ./scripts/generate-assets.ts",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "make-squirrel": "node ./scripts/make-squirrel.ts",

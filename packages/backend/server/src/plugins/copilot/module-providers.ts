@@ -23,6 +23,7 @@ import {
   CopilotEmbeddingJob,
 } from './embedding';
 import { WorkspaceMcpProvider } from './mcp/provider';
+import { UiManifestService } from './mcp/ui-manifest.service';
 import { PromptService } from './prompt';
 import {
   CopilotProviderFactory,
@@ -128,7 +129,7 @@ export const COPILOT_RESOLVER_PROVIDERS = [
 
 export const COPILOT_JOB_PROVIDERS = [CopilotEmbeddingJob, CopilotCronJobs];
 
-export const COPILOT_MCP_PROVIDERS = [WorkspaceMcpProvider];
+export const COPILOT_MCP_PROVIDERS = [WorkspaceMcpProvider, UiManifestService];
 
 export const COPILOT_KERNEL_PROVIDERS = [
   ...COPILOT_PROVIDER_PROVIDERS,

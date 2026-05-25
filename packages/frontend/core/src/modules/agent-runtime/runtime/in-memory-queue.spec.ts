@@ -51,7 +51,7 @@ describe('InMemoryJobQueue', () => {
 
     queue.setExecutor(
       (jobId, signal) =>
-        new Promise<void>((resolve, reject) => {
+        new Promise<void>((_, reject) => {
           expect(jobId).toBe('job-1');
           signal.addEventListener(
             'abort',

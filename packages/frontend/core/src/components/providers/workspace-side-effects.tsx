@@ -145,7 +145,8 @@ export const WorkspaceSideEffects = () => {
     const dispose = setupAIProvider(
       new CopilotClient(graphqlService.gql, eventSourceService.eventSource),
       globalDialogService,
-      authService
+      authService,
+      docsService
     );
     return () => {
       dispose();
@@ -156,6 +157,7 @@ export const WorkspaceSideEffects = () => {
     graphqlService,
     globalDialogService,
     authService,
+    docsService,
   ]);
 
   useRegisterWorkspaceCommands();

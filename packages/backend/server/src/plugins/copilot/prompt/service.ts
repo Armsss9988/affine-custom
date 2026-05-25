@@ -49,7 +49,7 @@ export class PromptService {
           });
 
     this.logWarnings(rendered.warnings, sessionId);
-    return rendered.messages;
+    return this.injectClientContext(rendered.messages, params);
   }
 
   renderSession(
@@ -81,7 +81,7 @@ export class PromptService {
           });
 
     this.logWarnings(rendered.warnings, sessionId);
-    return rendered.messages;
+    return this.injectClientContext(rendered.messages, params);
   }
 
   protected lookupCompatPrompt(_name: string): Prompt | null {
@@ -203,5 +203,61 @@ export class PromptService {
     for (const warning of warnings) {
       this.logger.warn(`${warning} in session ${sessionId}`);
     }
+  }
+
+  private injectClientContext(
+    messages: PromptMessage[],
+    params: PromptParams
+  ): PromptMessage[] {
+    if (!params || !params.clientContext) {
+      return messages;
+    }
+
+    const ctx = params.clientContext as any;
+    const currentRoute = ctx.currentRoute ?? 'unknown';
+    const allDocsCount = ctx.allDocsCount ?? 0;
+    const platform = ctx.platform ?? 'web';
+    const isMac = !!ctx.isMac;
+    const isMobile = !!ctx.isMobile;
+    const selectMode = !!ctx.selectMode;
+
+    const contextBlock = `
+
+---
+### USER CLIENT SIDE CONTEXT (THÔNG TIN NGỮ CẢNH CỦA NGƯỜI DÙNG)
+- Current Route/URL Path: ${currentRoute}
+- Total Documents in Workspace: ${allDocsCount}
+- Client Platform: ${platform}
+- Operating System: ${isMac ? 'macOS' : 'Windows/Linux/Other'}
+- Device Type: ${isMobile ? 'Mobile' : 'Desktop/Tablet'}
+- Selection/Checkbox Mode Active: ${selectMode ? 'Yes' : 'No'}
+
+### ASSISTANT INSTRUCTIONS FOR CLIENT CONTEXT
+Use the above "USER CLIENT SIDE CONTEXT" to provide highly relevant and context-aware responses:
+1. If the user asks about selecting multiple documents, check if "Selection/Checkbox Mode Active" is "Yes".
+   - If it is "No" (false), explain that they can enable selection/checkbox mode by clicking the checkbox icon (multiselect button) at the top of the document list (in the sub-header) or by right-clicking any document in the list to reveal the context menu.
+   - If it is "Yes" (true), explain that checkboxes are already active next to each document. They can check the documents they want and use the bulk action bar at the bottom to delete or export.
+2. If explaining keyboard shortcuts:
+   - If the user's OS is macOS, prioritize macOS shortcut keys: Command (⌘) and Option (⌥) (e.g. ⌘+K for search, ⌘+/ for AI, ⌘+N for new page).
+   - If the user's OS is Windows/Linux/Other, prioritize standard keyboard shortcuts: Ctrl and Alt (e.g. Ctrl+K, Ctrl+/, Ctrl+N).
+3. If they ask about creating pages or templates:
+   - Mention that they currently have ${allDocsCount} documents in their workspace.
+   - If their current view is a doc or all-page, tailor references accordingly.
+4. Respond in the same language as the user (e.g. if the user asks in Vietnamese, respond in Vietnamese).
+`;
+
+    // Try to find the system message and append the context
+    const systemMessage = messages.find(msg => msg.role === 'system');
+    if (systemMessage) {
+      systemMessage.content = (systemMessage.content ?? '') + contextBlock;
+    } else {
+      // If there's no system message, we can prepend a new one
+      messages.unshift({
+        role: 'system',
+        content: contextBlock,
+      });
+    }
+
+    return messages;
   }
 }

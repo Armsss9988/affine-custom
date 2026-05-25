@@ -36,15 +36,20 @@ import { ToolRegistry } from './services/tool-registry';
 
 import { WorkspaceServerService } from '../cloud';
 import { DocsService } from '../doc';
+import { DocsSearchService } from '../docs-search';
+import { AgentJobStore } from './store/agent-job-store';
 
 export function configureAgentRuntimeModule(framework: Framework) {
   framework
     .scope(WorkspaceScope)
+    .store(AgentJobStore)
     .service(ToolRegistry)
     .service(AgentRuntimeService, [
       ToolRegistry,
       WorkspaceService,
       WorkspaceServerService,
       DocsService,
+      AgentJobStore,
+      DocsSearchService,
     ]);
 }

@@ -1,0 +1,144 @@
+{
+  "commands": [
+    {
+      "id": "affine:goto-all-pages",
+      "label": "Go to All Pages (Đi đến tất cả tài liệu)",
+      "category": "navigation",
+      "keyBinding": null
+    },
+    {
+      "id": "affine:goto-collection-list",
+      "label": "Go to Collection List (Đi đến bộ sưu tập)",
+      "category": "navigation",
+      "keyBinding": null
+    },
+    {
+      "id": "affine:goto-tag-list",
+      "label": "Go to Tag List (Đi đến danh sách thẻ)",
+      "category": "navigation",
+      "keyBinding": null
+    },
+    {
+      "id": "affine:goto-workspace",
+      "label": "Go to Workspace (Chuyển workspace)",
+      "category": "navigation",
+      "keyBinding": null
+    },
+    {
+      "id": "affine:open-settings",
+      "label": "Open Settings (Mở cài đặt)",
+      "category": "navigation",
+      "keyBinding": { "mac": "⌘,", "win": "Ctrl+," }
+    },
+    {
+      "id": "affine:open-account",
+      "label": "Open Account Settings (Cài đặt tài khoản)",
+      "category": "navigation",
+      "keyBinding": null
+    },
+    {
+      "id": "affine:goto-trash",
+      "label": "Go to Trash (Đi đến Thùng rác)",
+      "category": "navigation",
+      "keyBinding": null
+    },
+    {
+      "id": "affine:new-doc",
+      "label": "New Doc / Create Page (Tạo trang mới)",
+      "category": "creation",
+      "keyBinding": { "mac": "⌘N", "win": "Ctrl+N" }
+    },
+    {
+      "id": "affine:quick-search",
+      "label": "Quick Search / Command Palette (Tìm kiếm nhanh)",
+      "category": "general",
+      "keyBinding": { "mac": "⌘K", "win": "Ctrl+K" }
+    }
+  ],
+  "shortcuts": {
+    "general": {
+      "Cancel / Close (Hủy / Đóng)": { "mac": ["ESC"], "win": ["ESC"] },
+      "Quick Search (Tìm kiếm nhanh)": { "mac": ["⌘", "K"], "win": ["Ctrl", "K"] },
+      "New Page (Tạo trang mới)": { "mac": ["⌘", "N"], "win": ["Ctrl", "N"] },
+      "Expand/Collapse Sidebar (Đóng/Mở thanh bên)": { "mac": ["⌘", "/"], "win": ["Ctrl", "/"] },
+      "Go Back (Quay lại trang trước)": { "mac": ["⌘", "["], "win": ["Ctrl", "["] },
+      "Go Forward (Đi tiếp trang sau)": { "mac": ["⌘", "]"], "win": ["Ctrl", "]"] },
+      "Copy Private Link (Sao chép liên kết riêng tư)": { "mac": ["⌘", "⇧", "C"], "win": ["Ctrl", "Shift", "C"] }
+    },
+    "edgeless": {
+      "Select All (Chọn tất cả)": { "mac": ["⌘", "A"], "win": ["Ctrl", "A"] },
+      "Undo (Hoàn tác)": { "mac": ["⌘", "Z"], "win": ["Ctrl", "Z"] },
+      "Redo (Làm lại)": { "mac": ["⌘", "⇧", "Z"], "win": ["Ctrl", "Y"] },
+      "Zoom In (Phóng to)": { "mac": ["⌘", "+"], "win": ["Ctrl", "+"] },
+      "Zoom Out (Thu nhỏ)": { "mac": ["⌘", "-"], "win": ["Ctrl", "-"] },
+      "Zoom to 100% (Phóng tỷ lệ 100%)": { "mac": ["⌥", "0"], "win": ["Alt", "0"] },
+      "Zoom to Fit (Phóng vừa màn hình)": { "mac": ["⌥", "1"], "win": ["Alt", "1"] },
+      "Select Tool (Công cụ chọn chuột)": { "mac": ["V"], "win": ["V"] },
+      "Text Tool (Công cụ viết chữ)": { "mac": ["T"], "win": ["T"] },
+      "Shape Tool (Công cụ vẽ hình khối)": { "mac": ["S"], "win": ["S"] },
+      "Pen Tool (Công cụ vẽ bút tự do)": { "mac": ["P"], "win": ["P"] },
+      "Hand Tool (Công cụ kéo màn hình)": { "mac": ["H"], "win": ["H"] },
+      "Group Elements (Nhóm các đối tượng)": { "mac": ["⌘", "G"], "win": ["Ctrl", "G"] },
+      "Ungroup Elements (Rã nhóm đối tượng)": { "mac": ["⌘", "⇧", "G"], "win": ["Ctrl", "Shift", "G"] }
+    },
+    "page": {
+      "Bold (Chữ in đậm)": { "mac": ["⌘", "B"], "win": ["Ctrl", "B"] },
+      "Italic (Chữ in nghiêng)": { "mac": ["⌘", "I"], "win": ["Ctrl", "I"] },
+      "Underline (Gạch chân)": { "mac": ["⌘", "U"], "win": ["Ctrl", "U"] },
+      "Strikethrough (Gạch ngang chữ)": { "mac": ["⌘", "⇧", "S"], "win": ["Ctrl", "Shift", "S"] },
+      "Inline Code (Viết code dòng lẻ)": { "mac": ["⌘", "E"], "win": ["Ctrl", "E"] },
+      "Code Block (Khối code đa dòng)": { "mac": ["⌘", "⌥", "C"], "win": ["Ctrl", "Alt", "C"] },
+      "Insert Link (Thêm liên kết)": { "mac": ["⌘", "K"], "win": ["Ctrl", "K"] },
+      "Increase Indent (Thụt đầu dòng)": { "mac": ["Tab"], "win": ["Tab"] },
+      "Decrease Indent (Giảm thụt lề)": { "mac": ["⇧", "Tab"], "win": ["Shift", "Tab"] },
+      "Heading 1 (Tiêu đề cấp 1)": { "mac": ["⌘", "⌥", "1"], "win": ["Ctrl", "Shift", "1"] },
+      "Heading 2 (Tiêu đề cấp 2)": { "mac": ["⌘", "⌥", "2"], "win": ["Ctrl", "Shift", "2"] },
+      "Heading 3 (Tiêu đề cấp 3)": { "mac": ["⌘", "⌥", "3"], "win": ["Ctrl", "Shift", "3"] }
+    },
+    "markdown": {
+      "Bold (In đậm)": { "syntax": "**Text** hoặc __Text__" },
+      "Italic (In nghiêng)": { "syntax": "*Text* hoặc _Text_" },
+      "Underline (Gạch chân)": { "syntax": "~Text~" },
+      "Strikethrough (Gạch ngang chữ)": { "syntax": "~~Text~~" },
+      "Divider (Đường kẻ ngang phân cách)": { "syntax": "***" },
+      "Inline Code (Code đơn dòng)": { "syntax": "`Text`" },
+      "Code Block (Khối code)": { "syntax": "``` + Space" },
+      "Heading 1 (Tiêu đề 1)": { "syntax": "# Text" },
+      "Heading 2 (Tiêu đề 2)": { "syntax": "## Text" },
+      "Heading 3 (Tiêu đề 3)": { "syntax": "### Text" }
+    }
+  },
+  "pages": {
+    "/all": {
+      "title": "All Docs (Tất cả tài liệu)",
+      "features": [
+        "Hiển thị danh sách tất cả các tài liệu trong workspace.",
+        "Multi-select Checkbox (Tích chọn nhiều tài liệu): Di chuột (hover) vào hàng của một tài liệu bất kỳ → xuất hiện các icon bên phải → Click vào icon Checkbox để hiện ô tích chọn bên trái cho toàn bộ danh sách.",
+        "Shift + Click: Nhấn giữ phím Shift và click chọn dòng đầu + dòng cuối để bôi đen/tích chọn hàng loạt tài liệu cùng lúc.",
+        "Floating Toolbar (Thanh công cụ nổi): Xuất hiện ở dưới cùng màn hình khi chọn từ 2 tài liệu trở lên. Cho phép chuyển tất cả tài liệu đã chọn vào thùng rác (Trash) hoặc thêm vào Collection cùng lúc.",
+        "Tìm kiếm nhanh (Quick Search): Phím tắt Ctrl+K hoặc ⌘K để mở thanh tìm kiếm tài liệu.",
+        "Sắp xếp (Sort): Sắp xếp danh sách tài liệu theo Title (Tiêu đề), Updated (Ngày cập nhật), Created (Ngày tạo).",
+        "Nhóm (Group): Gom nhóm tài liệu theo Tag (Thẻ), Date (Ngày sửa đổi), hoặc Creator (Người tạo)."
+      ],
+      "quickActions": [
+        "Thêm vào mục Yêu thích (Favorite) bằng icon hình ngôi sao.",
+        "Mở trong tab mới (Open in new tab).",
+        "Mở ở chế độ chia đôi màn hình (Open in split view).",
+        "Chuyển vào Thùng rác (Move to trash).",
+        "Tích chọn tài liệu (Select checkbox)."
+      ]
+    },
+    "/trash": {
+      "title": "Trash (Thùng rác)",
+      "features": [
+        "Hiển thị các tài liệu đã bị xóa tạm thời.",
+        "Khôi phục tài liệu (Restore): Click icon khôi phục ở cột Quick Actions để đưa tài liệu về danh sách hoạt động.",
+        "Xóa vĩnh viễn (Delete permanently): Click icon thùng rác màu đỏ trong Trash để xóa vĩnh viễn tài liệu, không thể khôi phục."
+      ],
+      "quickActions": [
+        "Khôi phục tài liệu (Restore from trash).",
+        "Xóa vĩnh viễn tài liệu (Delete permanently)."
+      ]
+    }
+  }
+}

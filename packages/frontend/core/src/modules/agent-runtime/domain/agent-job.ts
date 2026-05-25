@@ -4,6 +4,7 @@ export type AgentJobStatus =
   | 'planning'
   | 'running'
   | 'waiting_approval'
+  | 'waiting_network'
   | 'paused'
   | 'cancelling'
   | 'cancelled'
@@ -19,10 +20,11 @@ export type AgentWorkflowKind =
   | 'append_to_current_doc'
   | 'approval_demo'
   | 'llm_planner'
-  | 'background_chat';
+  | 'background_chat'
+  | 'chain';
 
 export function isActiveJobStatus(status: AgentJobStatus): boolean {
-  return ['queued', 'planning', 'running', 'waiting_approval'].includes(status);
+  return ['queued', 'planning', 'running', 'waiting_approval', 'waiting_network'].includes(status);
 }
 
 // ─── Error ─────────────────────────────────────────────────────
@@ -131,6 +133,8 @@ export interface AgentJob {
   completedAt?: string;
   /** Only present for background_chat workflow */
   chatOptions?: BackgroundChatOptions;
+  /** Only present for chain workflow */
+  chainId?: string;
 }
 
 /**
@@ -159,4 +163,5 @@ export interface EnqueueAgentJobInput {
   priority?: AgentJobPriority;
   /** Only required when workflow === 'background_chat' */
   chatOptions?: BackgroundChatOptions;
+  chainId?: string;
 }

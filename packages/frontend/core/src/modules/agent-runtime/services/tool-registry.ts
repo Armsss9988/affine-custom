@@ -3,6 +3,7 @@ import { Service } from '@toeverything/infra';
 import type { AgentTool, ToolRiskLevel } from '../domain/agent-tool';
 import { allChatTools } from '../tools/affine-chat-tools';
 import { allDocTools } from '../tools/affine-doc-tools';
+import { allSearchTools } from '../tools/affine-search-tools';
 import { allFakeTools } from '../tools/fake-tools';
 
 /**
@@ -21,6 +22,9 @@ export class ToolRegistry extends Service {
       this.register(tool);
     }
     for (const tool of allChatTools) {
+      this.register(tool);
+    }
+    for (const tool of allSearchTools) {
       this.register(tool);
     }
   }

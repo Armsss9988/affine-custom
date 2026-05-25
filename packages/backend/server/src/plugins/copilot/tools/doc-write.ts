@@ -217,7 +217,7 @@ export const buildKanbanHandler = (
   return async (
     options: CopilotChatOptions,
     title: string,
-    columns: { name: string; type: string; options?: string[] },
+    columns: { name: string; type: string; options?: string[] }[],
     statuses: string[],
     cards: { title: string; status?: string }[]
   ) => {

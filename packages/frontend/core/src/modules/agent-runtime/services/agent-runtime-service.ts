@@ -9,9 +9,11 @@ import {
   WorkspaceServerService,
 } from '@affine/core/modules/cloud';
 import { DocsService } from '@affine/core/modules/doc';
+import { DocsSearchService } from '../../docs-search';
 import { AIModelService } from '@affine/core/modules/ai-button';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { LiveData, Service } from '@toeverything/infra';
+import { NetworkMonitor } from '../runtime/network-monitor';
 
 import type {
   AgentArtifact,
@@ -22,6 +24,8 @@ import type {
   EnqueueAgentJobInput,
 } from '../domain/agent-job';
 import { isActiveJobStatus } from '../domain/agent-job';
+import { builtinChains } from '../chains/builtin-chains';
+import { resolveChainParams } from '../domain/agent-chain';
 import {
   generatePlanningPrompt,
   parsePlanningResponse,
@@ -33,6 +37,7 @@ import type {
   ToolExecutionContext,
 } from '../domain/agent-tool';
 import { InMemoryJobQueue } from '../runtime/in-memory-queue';
+import { AgentJobStore } from '../store/agent-job-store';
 import type { ToolRegistry } from './tool-registry';
 
 let jobIdCounter = 0;
@@ -100,7 +105,14 @@ function getErrorCode(error: unknown): AgentErrorCode {
  */
 export class AgentRuntimeService extends Service {
   private readonly jobMap = new Map<string, AgentJob>();
-  private readonly queue = new InMemoryJobQueue(8);
+  private readonly queue = new InMemoryJobQueue(2);
+  private emitTimeout: any = null;
+  private readonly networkMonitor = new NetworkMonitor();
+  private readonly networkWaiters = new Map<string, () => void>();
+
+  getNetworkMonitor() {
+    return this.networkMonitor;
+  }
   private readonly approvalResolvers = new Map<
     string,
     { jobId: string; resolve: (decision: ApprovalDecision) => void }
@@ -118,10 +130,38 @@ export class AgentRuntimeService extends Service {
     private readonly toolRegistry: ToolRegistry,
     private readonly workspaceService: WorkspaceService,
     private readonly workspaceServerService: WorkspaceServerService,
-    private readonly docsService: DocsService
+    private readonly docsService: DocsService,
+    private readonly jobStore: AgentJobStore,
+    private readonly docsSearchService: DocsSearchService
   ) {
     super();
     this.queue.setExecutor((jobId, signal) => this.executeJob(jobId, signal));
+    this.hydrateJobs();
+  }
+
+  private hydrateJobs(): void {
+    const workspaceId = this.workspaceService.workspace.id;
+    this.jobStore.listJobs(workspaceId).then(jobs => {
+      const mapped = jobs.map(job => {
+        if (isActiveJobStatus(job.status)) {
+          return {
+            ...job,
+            status: 'interrupted' as const,
+            error: {
+              code: 'UNKNOWN' as const,
+              message: 'Job was interrupted by an application reload.',
+            },
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return job;
+      });
+
+      for (const job of mapped) {
+        this.jobMap.set(job.id, job);
+      }
+      this.emitJobs(true);
+    });
   }
 
   // ─── Public API ────────────────────────────────────────────
@@ -150,17 +190,35 @@ export class AgentRuntimeService extends Service {
       createdAt: now,
       updatedAt: now,
       chatOptions: input.chatOptions,
+      chainId: input.chainId,
     };
 
     this.jobMap.set(job.id, job);
-    this.emitJobs();
+    this.emitJobs(true);
+    this.jobStore.saveJob(job);
     this.queue.enqueue(job.id);
     return job;
+  }
+
+  clearJobs(): void {
+    for (const [id, job] of this.jobMap.entries()) {
+      if (!isActiveJobStatus(job.status)) {
+        this.jobMap.delete(id);
+        this.jobStore.deleteJob(id);
+      }
+    }
+    this.emitJobs(true);
   }
 
   cancelJob(jobId: string): void {
     const job = this.jobMap.get(jobId);
     if (!job) return;
+
+    const waiter = this.networkWaiters.get(jobId);
+    if (waiter) {
+      waiter();
+      this.networkWaiters.delete(jobId);
+    }
 
     this.queue.cancel(jobId);
     for (const approval of job.approvals) {
@@ -240,6 +298,10 @@ export class AgentRuntimeService extends Service {
     );
   }
 
+  listChains() {
+    return builtinChains;
+  }
+
   // ─── Job Execution ─────────────────────────────────────────
 
   private async executeJob(jobId: string, signal: AbortSignal): Promise<void> {
@@ -267,6 +329,7 @@ export class AgentRuntimeService extends Service {
       });
 
       // Execute steps sequentially
+      let prevStepOutput: Record<string, unknown> | null = null;
       for (let i = 0; i < steps.length; i++) {
         if (signal.aborted) {
           throw new Error('Cancelled');
@@ -296,13 +359,75 @@ export class AgentRuntimeService extends Service {
             throw new Error(`Tool not found: ${step.toolName}`);
           }
 
+          // Network gate: if tool requires network and we're offline, wait
+          if (tool.requiresNetwork && !this.networkMonitor.isOnline) {
+            const currentProgress = this.jobMap.get(jobId)?.progress ?? {
+              currentStepIndex: i,
+              totalSteps: steps.length,
+              percent: Math.round((i / steps.length) * 100),
+              label: step.title,
+            };
+
+            step.status = 'pending'; // revert step status to pending
+            this.patchJob(jobId, {
+              status: 'waiting_network',
+              plan: [...steps],
+              progress: {
+                ...currentProgress,
+                label: 'Waiting for network...',
+              },
+            });
+
+            // Wait for network to come back or cancellation
+            await new Promise<void>((resolve, reject) => {
+              if (signal.aborted) {
+                reject(new Error('Cancelled'));
+                return;
+              }
+
+              const sub = this.networkMonitor.online$.subscribe(online => {
+                if (online) {
+                  sub.unsubscribe();
+                  this.networkWaiters.delete(jobId);
+                  resolve();
+                }
+              });
+
+              this.networkWaiters.set(jobId, () => {
+                sub.unsubscribe();
+                reject(new Error('Cancelled'));
+              });
+
+              signal.addEventListener('abort', () => {
+                sub.unsubscribe();
+                this.networkWaiters.delete(jobId);
+                reject(new Error('Cancelled'));
+              }, { once: true });
+            });
+
+            // Resume — update status back to running
+            step.status = 'running';
+            this.patchJob(jobId, {
+              status: 'running',
+              plan: [...steps],
+              progress: { ...currentProgress, label: step.title },
+            });
+          }
+
           const toolCtx = this.createToolContext(jobId, step.id, signal);
           try {
-            const result = await tool.execute(
-              step.toolInput ?? step.toolInputPreview ?? {},
-              toolCtx
-            );
+            const isChain = job.workflow === 'chain';
+            const resolvedInput = isChain
+              ? resolveChainParams(
+                  (step.toolInput ?? {}) as Record<string, unknown>,
+                  prevStepOutput,
+                  job.context
+                )
+              : step.toolInput ?? step.toolInputPreview ?? {};
+
+            const result = await tool.execute(resolvedInput, toolCtx);
             step.toolOutputPreview = result;
+            prevStepOutput = result as Record<string, unknown>;
             step.status = 'succeeded';
           } catch (err) {
             step.status = 'failed';
@@ -535,6 +660,20 @@ export class AgentRuntimeService extends Service {
           ),
         ];
       }
+      case 'chain': {
+        const chain = builtinChains.find(c => c.id === job.chainId);
+        if (!chain) {
+          throw new Error(`Chain template not found: ${job.chainId}`);
+        }
+        return chain.steps.map(stepTpl =>
+          createStep(
+            job.id,
+            stepTpl.title,
+            stepTpl.toolName,
+            stepTpl.params
+          )
+        );
+      }
       default:
         return [];
     }
@@ -551,6 +690,7 @@ export class AgentRuntimeService extends Service {
       workspaceId: job?.workspaceId ?? '',
       workspace: this.workspaceService.workspace,
       docsService: this.docsService,
+      docsSearchService: this.docsSearchService,
       signal,
       addLog: log => {
         const fullLog: AgentLog = {
@@ -651,14 +791,49 @@ export class AgentRuntimeService extends Service {
 
     const updated = { ...job, ...patch, updatedAt: new Date().toISOString() };
     this.jobMap.set(jobId, updated);
-    this.emitJobs();
+
+    // Sync emission for terminal or critical user-interactive states
+    const isTerminal =
+      patch.status &&
+      [
+        'succeeded',
+        'failed',
+        'cancelled',
+        'waiting_approval',
+        'paused',
+        'interrupted',
+      ].includes(patch.status);
+    this.emitJobs(!!isTerminal);
+
+    // Persist to IndexedDB
+    this.jobStore.saveJob(updated);
   }
 
-  private emitJobs(): void {
-    this.jobs$.next(this.listJobs());
+  private emitJobs(sync = false): void {
+    if (sync) {
+      if (this.emitTimeout) {
+        clearTimeout(this.emitTimeout);
+        this.emitTimeout = null;
+      }
+      this.jobs$.next(this.listJobs());
+      return;
+    }
+
+    if (this.emitTimeout) return;
+
+    this.emitTimeout = setTimeout(() => {
+      this.emitTimeout = null;
+      this.jobs$.next(this.listJobs());
+    }, 80);
   }
 
   override dispose(): void {
+    if (this.emitTimeout) {
+      clearTimeout(this.emitTimeout);
+      this.emitTimeout = null;
+    }
+    this.networkMonitor.dispose();
+    this.networkWaiters.clear();
     this.queue.dispose();
     this.approvalResolvers.clear();
     super.dispose();

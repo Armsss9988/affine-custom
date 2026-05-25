@@ -17,6 +17,7 @@ export const affineChatTool: AgentTool<
   description:
     'Streams a chat response in the background via an existing session',
   riskLevel: 'read',
+  requiresNetwork: true,
   inputSchema: {},
 
   async execute(input: BackgroundChatOptions, ctx: ToolExecutionContext) {

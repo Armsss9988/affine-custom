@@ -18,6 +18,7 @@ export interface ToolExecutionContext {
   workspaceId: string;
   workspace: Workspace;
   docsService: DocsService;
+  docsSearchService: import('../../docs-search').DocsSearchService;
   signal: AbortSignal;
   addLog(log: Omit<AgentLog, 'id' | 'jobId' | 'createdAt'>): void;
   addArtifact(
@@ -31,6 +32,8 @@ export interface AgentTool<TInput = unknown, TOutput = unknown> {
   name: string;
   description: string;
   riskLevel: ToolRiskLevel;
+  /** If true, tool requires server connectivity. Default: false. */
+  requiresNetwork?: boolean;
   inputSchema: unknown;
   execute(input: TInput, ctx: ToolExecutionContext): Promise<TOutput>;
 }

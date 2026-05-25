@@ -10,6 +10,7 @@ import {
   isActiveJobStatus,
 } from '@affine/core/modules/agent-runtime';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
+import { WorkbenchService } from '@affine/core/modules/workbench';
 import { useLiveData, useService } from '@toeverything/infra';
 import clsx from 'clsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -21,6 +22,7 @@ const statusLabel: Record<AgentJobStatus, string> = {
   planning: 'Planning',
   running: 'Running',
   waiting_approval: 'Needs Approval',
+  waiting_network: 'Offline — Waiting',
   paused: 'Paused',
   cancelling: 'Cancelling',
   cancelled: 'Cancelled',
@@ -56,6 +58,7 @@ function getStatusStyle(status: AgentJobStatus): string {
     case 'interrupted':
       return styles.statusFailed;
     case 'waiting_approval':
+    case 'waiting_network':
       return styles.statusWaiting;
     default:
       return styles.statusQueued;
@@ -428,6 +431,7 @@ export const AgentJobDock = () => {
   const featureFlags = useService(FeatureFlagService).flags;
   const enabled = useLiveData(featureFlags.enable_agent_runtime.$);
   const agentRuntime = useService(AgentRuntimeService);
+  const workbench = useService(WorkbenchService).workbench;
   const jobs = useLiveData(agentRuntime.jobs$);
   const activeCount = useLiveData(agentRuntime.activeJobCount$);
   const [open, setOpen] = useState(false);
@@ -470,9 +474,8 @@ export const AgentJobDock = () => {
     [agentRuntime]
   );
   const handleOpenDoc = useCallback((docId: string) => {
-    // TODO: implement doc navigation - open doc with given ID
-    console.log('[AgentJobDock] Open doc:', docId);
-  }, []);
+    workbench.openDoc(docId);
+  }, [workbench]);
 
   const handleSelectJob = useCallback((id: string) => {
     setSelectedJobId(prev => (prev === id ? null : id));

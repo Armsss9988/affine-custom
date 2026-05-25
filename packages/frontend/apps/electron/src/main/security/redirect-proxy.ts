@@ -3,10 +3,10 @@ import { isAllowedRedirectTarget } from '@toeverything/infra/utils';
 import { buildType, isDev } from '../config';
 
 const API_BASE_BY_BUILD_TYPE: Record<typeof buildType, string> = {
-  stable: 'https://app.affine.pro',
-  beta: 'https://insider.affine.pro',
-  internal: 'https://insider.affine.pro',
-  canary: 'https://affine.fail',
+  stable: 'http://localhost:3010',
+  beta: 'http://localhost:3010',
+  internal: 'http://localhost:3010',
+  canary: 'http://localhost:3010',
 };
 
 function resolveCurrentHostnameForRedirectAllowlist() {

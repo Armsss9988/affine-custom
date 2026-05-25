@@ -9,6 +9,7 @@ if (newE2E) {
 
 export default {
   timeout: '1m',
+  nodeArguments: ['--import=../../../tools/cli/register.js'],
   extensions: {
     ts: 'module',
   },

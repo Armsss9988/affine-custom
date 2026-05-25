@@ -17,6 +17,8 @@ import type { PromptKey } from './prompt';
 import { textToText, toImage } from './request';
 import { setupTracker } from './tracker';
 
+import type { DocsService } from '@affine/core/modules/doc';
+
 function toAIUserInfo(account: AuthAccountInfo | null) {
   if (!account) return null;
   return {
@@ -47,7 +49,8 @@ const processTypeToPromptName = new Map<string, PromptKey>(
 export function setupAIProvider(
   client: CopilotClient,
   globalDialogService: GlobalDialogService,
-  authService: AuthService
+  authService: AuthService,
+  docsService?: DocsService
 ) {
   async function createSession({
     promptName,
@@ -102,6 +105,14 @@ export function setupAIProvider(
         selectedMarkdown: contexts?.selectedMarkdown,
         html: contexts?.html,
         ...(options.docId ? { currentDocId: options.docId } : {}),
+        clientContext: {
+          currentRoute: typeof window !== 'undefined' ? window.location.pathname : '',
+          allDocsCount: docsService?.list?.docs$.value?.length ?? 0,
+          platform: typeof BUILD_CONFIG !== 'undefined' && BUILD_CONFIG.isElectron ? 'desktop' : 'web',
+          isMac: (globalThis as any).environment?.isMacOs ?? (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac')),
+          isMobile: (globalThis as any).environment?.isMobile ?? (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mobile')),
+          selectMode: typeof document !== 'undefined' ? !!document.querySelector('[data-select-mode="true"]') : false,
+        },
       },
       endpoint: Endpoint.StreamObject,
     });
