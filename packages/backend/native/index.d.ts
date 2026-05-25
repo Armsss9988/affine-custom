@@ -21,22 +21,18 @@ export interface ActionEvent {
   trace?: ActionTrace
 }
 
-export declare const enum ActionEventType {
-  ActionStart = 'action_start',
-  StepStart = 'step_start',
-  Attachment = 'attachment',
-  StepEnd = 'step_end',
-  ActionDone = 'action_done',
-  Error = 'error'
-}
+export type ActionEventType =  'action_start'|
+'step_start'|
+'attachment'|
+'step_end'|
+'action_done'|
+'error';
 
-export declare const enum ActionRunStatus {
-  Created = 'created',
-  Running = 'running',
-  Succeeded = 'succeeded',
-  Failed = 'failed',
-  Aborted = 'aborted'
-}
+export type ActionRunStatus =  'created'|
+'running'|
+'succeeded'|
+'failed'|
+'aborted';
 
 export interface ActionRuntimeInput {
   recipeId: string
@@ -457,15 +453,13 @@ export declare function parseWorkspaceDoc(docBin: Buffer): NativeWorkspaceDocCon
 
 export declare function processImage(input: Buffer, maxEdge: number, keepExif: boolean): Promise<Buffer>
 
-export declare const enum PromptBuiltin {
-  Date = 'Date',
-  Language = 'Language',
-  Timezone = 'Timezone',
-  HasDocs = 'HasDocs',
-  HasFiles = 'HasFiles',
-  HasSelected = 'HasSelected',
-  HasCurrentDoc = 'HasCurrentDoc'
-}
+export type PromptBuiltin =  'Date'|
+'Language'|
+'Timezone'|
+'HasDocs'|
+'HasFiles'|
+'HasSelected'|
+'HasCurrentDoc';
 
 export interface PromptCountMessage {
   content: string
