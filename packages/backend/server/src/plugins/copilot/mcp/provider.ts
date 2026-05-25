@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { pick } from 'lodash-es';
-import z from 'zod/v3';
+import z from 'zod';
 import * as Y from 'yjs';
 
 import {

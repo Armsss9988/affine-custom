@@ -107,15 +107,15 @@ export async function run() {
   app.useWebSocketAdapter(adapter);
 
   if (env.dev) {
-    const { SwaggerModule, DocumentBuilder } = await import('@nestjs/swagger');
+    const swagger = await import('@nestjs/swagger');
     // Swagger API Docs
-    const docConfig = new DocumentBuilder()
+    const docConfig = new swagger.DocumentBuilder()
       .setTitle('AFFiNE API')
       .setDescription(`AFFiNE Server ${env.version} API documentation`)
       .setVersion(`${env.version}`)
       .build();
-    const documentFactory = () => SwaggerModule.createDocument(app, docConfig);
-    SwaggerModule.setup('/api/docs', app, documentFactory, {
+    const documentFactory = () => swagger.SwaggerModule.createDocument(app, docConfig);
+    swagger.SwaggerModule.setup('/api/docs', app, documentFactory, {
       useGlobalPrefix: true,
       swaggerOptions: { persistAuthorization: true },
     });
