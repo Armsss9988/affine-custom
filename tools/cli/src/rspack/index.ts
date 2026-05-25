@@ -662,6 +662,7 @@ export function createNodeTargetConfig(
           const lazyImports = [
             '@nestjs/microservices',
             '@nestjs/websockets/socket-module',
+            '@nestjs/swagger',
             '@apollo/subgraph',
             '@apollo/gateway',
             '@as-integrations/fastify',
