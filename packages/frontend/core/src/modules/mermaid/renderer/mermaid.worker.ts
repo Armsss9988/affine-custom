@@ -2,6 +2,7 @@ import type { MessageCommunicapable } from '@toeverything/infra/op';
 import { OpConsumer } from '@toeverything/infra/op';
 import initMmdr, { render_mermaid_svg } from '@toeverything/mermaid-wasm';
 
+import { MERMAID_MODERN_FONT_FAMILY } from './theme';
 import type {
   MermaidOps,
   MermaidRenderOptions,
@@ -12,7 +13,7 @@ const DEFAULT_RENDER_OPTIONS: MermaidRenderOptions = {
   fastText: true,
   svgOnly: true,
   theme: 'modern',
-  fontFamily: 'IBM Plex Mono',
+  fontFamily: MERMAID_MODERN_FONT_FAMILY,
 };
 
 function mergeOptions(

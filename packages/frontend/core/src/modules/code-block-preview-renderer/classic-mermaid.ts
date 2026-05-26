@@ -1,4 +1,4 @@
-import type { Mermaid } from 'mermaid';
+import type { Mermaid, MermaidConfig } from 'mermaid';
 
 import type {
   MermaidRenderOptions,
@@ -6,20 +6,38 @@ import type {
   MermaidRenderResult,
   MermaidRenderTheme,
 } from '../mermaid/renderer';
+import {
+  MERMAID_MODERN_FONT_FAMILY,
+  MERMAID_MODERN_THEME_VARIABLES,
+} from '../mermaid/renderer/theme';
 
 let mermaidPromise: Promise<Mermaid> | null = null;
 let mermaidRenderQueue: Promise<void> = Promise.resolve();
 
 function toTheme(theme: MermaidRenderTheme | undefined) {
-  return theme === 'modern' ? ('base' as const) : ('default' as const);
+  return theme === 'default' ? ('default' as const) : ('base' as const);
 }
 
-function createClassicMermaidConfig(options?: MermaidRenderOptions) {
+function createClassicMermaidConfig(
+  options?: MermaidRenderOptions
+): MermaidConfig {
+  const theme = toTheme(options?.theme);
+  const fontFamily = options?.fontFamily ?? MERMAID_MODERN_FONT_FAMILY;
+
   return {
     startOnLoad: false,
-    theme: toTheme(options?.theme),
+    theme,
+    darkMode: false,
     securityLevel: 'strict' as const,
-    fontFamily: options?.fontFamily ?? 'IBM Plex Mono',
+    fontFamily,
+    themeVariables:
+      theme === 'base'
+        ? {
+            ...MERMAID_MODERN_THEME_VARIABLES,
+            fontFamily,
+          }
+        : undefined,
+    htmlLabels: true,
     flowchart: { useMaxWidth: true, htmlLabels: true },
     sequence: { useMaxWidth: true },
     gantt: { useMaxWidth: true },

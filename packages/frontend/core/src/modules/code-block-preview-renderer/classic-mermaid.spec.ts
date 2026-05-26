@@ -12,6 +12,10 @@ vi.mock('mermaid', () => ({
   },
 }));
 
+import {
+  MERMAID_MODERN_FONT_FAMILY,
+  MERMAID_MODERN_THEME_VARIABLES,
+} from '../mermaid/renderer/theme';
 import { renderClassicMermaidSvg } from './classic-mermaid';
 
 describe('renderClassicMermaidSvg', () => {
@@ -70,5 +74,43 @@ describe('renderClassicMermaidSvg', () => {
       'init:base',
       'render:second:start',
     ]);
+    expect(initialize).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        theme: 'base',
+        fontFamily: MERMAID_MODERN_FONT_FAMILY,
+        themeVariables: expect.objectContaining({
+          primaryTextColor: MERMAID_MODERN_THEME_VARIABLES.primaryTextColor,
+          primaryColor: MERMAID_MODERN_THEME_VARIABLES.primaryColor,
+        }),
+      })
+    );
+  });
+
+  test('uses modern high contrast theme by default', async () => {
+    initialize.mockImplementation(() => {});
+    render.mockResolvedValue({ svg: '<svg>diagram</svg>' });
+
+    await expect(
+      renderClassicMermaidSvg({
+        code: 'flowchart TD;A-->B',
+      })
+    ).resolves.toEqual({
+      svg: '<svg>diagram</svg>',
+      rendererUsed: 'classic',
+    });
+
+    expect(initialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        theme: 'base',
+        darkMode: false,
+        fontFamily: MERMAID_MODERN_FONT_FAMILY,
+        themeVariables: expect.objectContaining({
+          textColor: MERMAID_MODERN_THEME_VARIABLES.textColor,
+          primaryTextColor: MERMAID_MODERN_THEME_VARIABLES.primaryTextColor,
+          primaryBorderColor: MERMAID_MODERN_THEME_VARIABLES.primaryBorderColor,
+        }),
+      })
+    );
   });
 });

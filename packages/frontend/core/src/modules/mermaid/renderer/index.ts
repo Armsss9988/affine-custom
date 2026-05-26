@@ -29,6 +29,10 @@ export function getMermaidRenderer() {
   return sharedMermaidRenderer;
 }
 
+export {
+  MERMAID_MODERN_FONT_FAMILY,
+  MERMAID_MODERN_THEME_VARIABLES,
+} from './theme';
 export type {
   MermaidOps,
   MermaidRenderOptions,
