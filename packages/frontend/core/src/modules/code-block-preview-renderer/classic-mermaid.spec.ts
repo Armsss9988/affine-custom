@@ -109,6 +109,9 @@ describe('renderClassicMermaidSvg', () => {
           textColor: MERMAID_MODERN_THEME_VARIABLES.textColor,
           primaryTextColor: MERMAID_MODERN_THEME_VARIABLES.primaryTextColor,
           primaryBorderColor: MERMAID_MODERN_THEME_VARIABLES.primaryBorderColor,
+          cScale0: MERMAID_MODERN_THEME_VARIABLES.cScale0,
+          cScaleLabel0: MERMAID_MODERN_THEME_VARIABLES.cScaleLabel0,
+          gitBranchLabel0: MERMAID_MODERN_THEME_VARIABLES.gitBranchLabel0,
         }),
       })
     );
