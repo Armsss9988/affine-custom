@@ -559,7 +559,38 @@ router.post('/responses', async (req, res) => {
   }
 });
 
-// 4a. Gemini Embedding API (batchEmbedContents)
+// 4a. Gemini Embedding API — single item: embedContent
+//     Called by AFFiNE Gemini provider for single-text embedding
+router.post('/models/:modelName\\:embedContent', async (req, res) => {
+  const { modelName } = req.params;
+  const { content, taskType } = req.body;
+  const requestId = genResponseId();
+
+  console.log(`[Copilot Gemini EmbedContent] ${requestId} model=${modelName} taskType=${taskType}`);
+
+  try {
+    const { embedText } = require('./nim');
+
+    // Extract text from Gemini format: content.parts[].text
+    const parts = content?.parts || [];
+    const text = parts.map(p => p.text || '').join(' ').trim() || 'empty';
+
+    const vector = await embedText(text);
+
+    // Gemini embedContent response format
+    res.json({
+      embedding: {
+        values: vector
+      }
+    });
+    console.log(`[Copilot Gemini EmbedContent] ${requestId} completed dim=${vector.length}`);
+  } catch (err) {
+    console.error(`[Copilot Gemini EmbedContent] ${requestId} Error:`, err.message);
+    if (!res.headersSent) { res.status(500).json({ error: { message: err.message } }); }
+  }
+});
+
+// 4b. Gemini Embedding API — batch: batchEmbedContents
 //     Converts Gemini embedding format → NIM OpenAI embedding format → Gemini format back
 router.post('/models/:modelName\\:batchEmbedContents', async (req, res) => {
   const { modelName } = req.params;
@@ -589,7 +620,7 @@ router.post('/models/:modelName\\:batchEmbedContents', async (req, res) => {
       } catch (e) {
         console.error(`[Copilot Gemini Embed] ${requestId} embedding error:`, e.message);
         // Return zero vector on error
-        return { values: new Array(256).fill(0) };
+        return { values: new Array(1024).fill(0) };
       }
     }));
 
@@ -828,6 +859,57 @@ router.post('/models/:modelName\\::action', async (req, res) => {
   } catch (err) {
     console.error('[Copilot Gemini Proxy] Error:', err.message);
     if (!res.headersSent) { res.status(500).json({ error: { message: err.message } }); }
+  }
+});
+
+// 5. OpenAI Embeddings API
+router.post('/embeddings', async (req, res) => {
+  const { model, input } = req.body;
+  const requestId = genResponseId();
+
+  console.log(`[Copilot Embeddings] ${requestId} model=${model} inputType=${typeof input}`);
+
+  if (!input) {
+    return res.status(400).json({ error: { message: 'input is required' } });
+  }
+
+  try {
+    const { embedText } = require('./nim');
+
+    let texts = [];
+    if (Array.isArray(input)) {
+      texts = input;
+    } else {
+      texts = [input];
+    }
+
+    const vectors = await Promise.all(
+      texts.map(async (text) => {
+        return await embedText(text);
+      })
+    );
+
+    const data = vectors.map((vector, index) => ({
+      object: 'embedding',
+      index: index,
+      embedding: vector,
+    }));
+
+    res.json({
+      object: 'list',
+      data,
+      model: model || process.env.NIM_EMBEDDING_MODEL || 'nvidia/nv-embedqa-e5-v5',
+      usage: {
+        prompt_tokens: 0,
+        total_tokens: 0,
+      },
+    });
+    console.log(`[Copilot Embeddings] ${requestId} completed ${data.length} embeddings`);
+  } catch (err) {
+    console.error(`[Copilot Embeddings] ${requestId} Error:`, err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: { message: err.message, type: 'api_error' } });
+    }
   }
 });
 

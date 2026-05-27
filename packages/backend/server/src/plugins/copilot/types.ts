@@ -30,7 +30,7 @@ const ToolsConfigSchema = z.preprocess(
   },
   z
     .record(
-      z.enum(['searchWorkspace', 'readingDocs', 'webSearch']),
+      z.enum(['searchWorkspace', 'readingDocs', 'webSearch', 'researchTools']),
       z.boolean()
     )
     .default({})

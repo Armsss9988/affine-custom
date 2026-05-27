@@ -145,17 +145,25 @@ export class CopilotSessionModel extends BaseModel {
   }
 
   private async ensurePromptCompatRecord(prompt: ChatPrompt) {
-    await this.db.aiPrompt.upsert({
-      where: { name: prompt.name },
-      update: {},
-      create: {
-        name: prompt.name,
-        action: prompt.action,
-        model: prompt.model,
-        optionalModels: [],
-        config: {},
-      },
-    });
+    try {
+      await this.db.aiPrompt.upsert({
+        where: { name: prompt.name },
+        update: {},
+        create: {
+          name: prompt.name,
+          action: prompt.action,
+          model: prompt.model,
+          optionalModels: [],
+          config: {},
+        },
+      });
+    } catch (e: any) {
+      // P2002: Unique constraint violation — another concurrent request already created the record.
+      // This is safe to ignore since upsert's intent (ensure-record-exists) is already satisfied.
+      if (e?.code !== 'P2002') {
+        throw e;
+      }
+    }
   }
 
   private sanitizeString<T extends string | null | undefined>(value: T): T {

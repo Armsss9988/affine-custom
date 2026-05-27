@@ -32,6 +32,7 @@ BEGIN
     );
 
     IF has_hnsw THEN
+      DROP INDEX IF EXISTS "ai_context_embeddings_idx";
       CREATE INDEX IF NOT EXISTS "ai_context_embeddings_idx"
         ON "ai_context_embeddings" USING hnsw ("embedding" vector_cosine_ops);
     END IF;
@@ -64,6 +65,7 @@ BEGIN
     );
 
     IF has_hnsw THEN
+      DROP INDEX IF EXISTS "ai_workspace_embeddings_idx";
       CREATE INDEX IF NOT EXISTS "ai_workspace_embeddings_idx"
         ON "ai_workspace_embeddings" USING hnsw ("embedding" vector_cosine_ops);
     END IF;
@@ -94,6 +96,7 @@ BEGIN
     );
 
     IF has_hnsw THEN
+      DROP INDEX IF EXISTS "ai_workspace_file_embeddings_idx";
       CREATE INDEX IF NOT EXISTS "ai_workspace_file_embeddings_idx"
         ON "ai_workspace_file_embeddings" USING hnsw ("embedding" vector_cosine_ops);
     END IF;
@@ -124,6 +127,7 @@ BEGIN
     );
 
     IF has_hnsw THEN
+      DROP INDEX IF EXISTS "ai_workspace_blob_embeddings_idx";
       CREATE INDEX IF NOT EXISTS "ai_workspace_blob_embeddings_idx"
         ON "ai_workspace_blob_embeddings" USING hnsw ("embedding" vector_cosine_ops);
     END IF;

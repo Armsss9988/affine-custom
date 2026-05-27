@@ -85,6 +85,22 @@ export function getTools(
           });
         }
         break;
+      case 'researchTools':
+        if (value === false) {
+          result = result.filter(tool => {
+            return ![
+              'academicSearch',
+              'arxivSearch',
+              'webSearchFree',
+              'urlContentRead',
+              'wikipediaSearch',
+              'citationFormat',
+              'translateText',
+              'docSynthesis',
+            ].includes(tool);
+          });
+        }
+        break;
     }
   });
   return result;

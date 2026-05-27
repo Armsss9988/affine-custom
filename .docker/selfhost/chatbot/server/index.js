@@ -31,8 +31,8 @@ app.use('/v1', copilotRouter);
 app.use('/v1beta', copilotRouter);
 
 // REST API endpoints for ChatGPT Integration (Documents CRUD and Search)
-const docsRouter = require('./docs');
-app.use('/api/docs', docsRouter);
+// const docsRouter = require('./docs');
+// app.use('/api/docs', docsRouter);
 
 // Chat endpoint (streaming via SSE)
 app.post('/api/chat', async (req, res) => {

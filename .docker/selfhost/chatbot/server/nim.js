@@ -45,10 +45,20 @@ async function embedText(text) {
 async function chatStream(messages, options = {}) {
   const collapsedMessages = [];
   for (const m of messages) {
-    if (collapsedMessages.length > 0 && collapsedMessages[collapsedMessages.length - 1].role === m.role) {
-      collapsedMessages[collapsedMessages.length - 1].content += '\n\n' + m.content;
+    const last = collapsedMessages[collapsedMessages.length - 1];
+    if (
+      last &&
+      last.role === m.role &&
+      m.role !== 'tool' &&
+      !last.tool_calls &&
+      !m.tool_calls
+    ) {
+      last.content = (last.content || '') + '\n\n' + (m.content || '');
     } else {
-      collapsedMessages.push({ role: m.role, content: m.content });
+      const item = { role: m.role, content: m.content };
+      if (m.tool_calls) item.tool_calls = m.tool_calls;
+      if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
+      collapsedMessages.push(item);
     }
   }
 
@@ -89,10 +99,20 @@ async function chatStream(messages, options = {}) {
 async function chatComplete(messages, options = {}) {
   const collapsedMessages = [];
   for (const m of messages) {
-    if (collapsedMessages.length > 0 && collapsedMessages[collapsedMessages.length - 1].role === m.role) {
-      collapsedMessages[collapsedMessages.length - 1].content += '\n\n' + m.content;
+    const last = collapsedMessages[collapsedMessages.length - 1];
+    if (
+      last &&
+      last.role === m.role &&
+      m.role !== 'tool' &&
+      !last.tool_calls &&
+      !m.tool_calls
+    ) {
+      last.content = (last.content || '') + '\n\n' + (m.content || '');
     } else {
-      collapsedMessages.push({ role: m.role, content: m.content });
+      const item = { role: m.role, content: m.content };
+      if (m.tool_calls) item.tool_calls = m.tool_calls;
+      if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
+      collapsedMessages.push(item);
     }
   }
 

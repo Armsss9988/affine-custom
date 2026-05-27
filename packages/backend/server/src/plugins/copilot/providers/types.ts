@@ -94,6 +94,33 @@ export const PromptToolsSchema = z
     'sectionEdit',
     // kanban board creation
     'kanbanCreate',
+    // doc lifecycle management
+    'docList',
+    'docDelete',
+    'docRestore',
+    'docInfo',
+    // sharing
+    'docShareEnable',
+    'docShareDisable',
+    // comments
+    'commentList',
+    'commentCreate',
+    'commentReply',
+    'commentResolve',
+    // workspace info
+    'workspaceInfo',
+    // journal
+    'journalRead',
+    'journalWrite',
+    // research tools
+    'academicSearch',
+    'arxivSearch',
+    'webSearchFree',
+    'urlContentRead',
+    'wikipediaSearch',
+    'citationFormat',
+    'translateText',
+    'docSynthesis',
   ])
   .array();
 

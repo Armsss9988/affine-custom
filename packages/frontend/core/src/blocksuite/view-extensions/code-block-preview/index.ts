@@ -17,6 +17,19 @@ import {
   CodeBlockTypstPreview,
   effects as typstPreviewEffects,
 } from './typst-preview';
+import {
+  CodeBlockPlaygroundPreviews,
+  effects as playgroundPreviewEffects,
+} from './playground-preview';
+import {
+  CodeBlockApiPreviews,
+  effects as apiPreviewEffects,
+} from './api-preview';
+import { CodeBlockDbPreviews, effects as dbPreviewEffects } from './db-preview';
+import {
+  CodeBlockSlidesPreviews,
+  effects as slidesPreviewEffects,
+} from './slides-preview';
 
 const optionsSchema = z.object({
   framework: z.instanceof(FrameworkProvider).optional(),
@@ -33,6 +46,10 @@ export class CodeBlockPreviewViewExtension extends ViewExtensionProvider {
     htmlPreviewEffects();
     mermaidPreviewEffects();
     typstPreviewEffects();
+    playgroundPreviewEffects();
+    apiPreviewEffects();
+    dbPreviewEffects();
+    slidesPreviewEffects();
   }
 
   override setup(
@@ -43,5 +60,25 @@ export class CodeBlockPreviewViewExtension extends ViewExtensionProvider {
     context.register(CodeBlockHtmlPreview);
     context.register(CodeBlockMermaidPreview);
     context.register(CodeBlockTypstPreview);
+
+    // Register all playground previews
+    CodeBlockPlaygroundPreviews.forEach(ext => {
+      context.register(ext);
+    });
+
+    // Register all API Client previews
+    CodeBlockApiPreviews.forEach(ext => {
+      context.register(ext);
+    });
+
+    // Register all Database & Tree viewer previews
+    CodeBlockDbPreviews.forEach(ext => {
+      context.register(ext);
+    });
+
+    // Register all Markdown slideshow previews
+    CodeBlockSlidesPreviews.forEach(ext => {
+      context.register(ext);
+    });
   }
 }

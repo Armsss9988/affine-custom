@@ -721,7 +721,15 @@
         "docCompose",
         "codeArtifact",
         "blobRead",
-        "kanbanCreate"
+        "kanbanCreate",
+        "academicSearch",
+        "arxivSearch",
+        "webSearchFree",
+        "urlContentRead",
+        "wikipediaSearch",
+        "citationFormat",
+        "translateText",
+        "docSynthesis"
       ],
       "proModels": [
         "gemini-2.5-pro",

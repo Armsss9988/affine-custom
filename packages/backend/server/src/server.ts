@@ -33,6 +33,8 @@ export async function run() {
     bufferLogs: true,
   });
 
+  app.set('trust proxy', true);
+
   app.useBodyParser('raw', { limit: 100 * OneMB });
 
   const logger = app.get(AFFiNELogger);

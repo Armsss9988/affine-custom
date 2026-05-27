@@ -8,13 +8,12 @@ export default function loader(content) {
   const name = parse(this.resourcePath).base;
   this.emitFile(name, content);
 
-  // Output CommonJS module.exports instead of ESM export default.
-  // ESM `export default variable` causes rspack to generate a live-binding
-  // getter placed BEFORE the let-declaration, causing TDZ on Node.js v22.
-  // CJS module.exports avoids this issue entirely.
+  // Use var to prevent TDZ. Use a custom function name __req instead of require
+  // to prevent Rspack from parsing and recursively bundling the .node files.
   return `
-    'use strict';
-    var _require = require;
-    module.exports = _require('./${name}');
+    import { createRequire as __createRequire } from 'node:module';
+    var __req = __createRequire(import.meta.url);
+    var __binding = __req('./${name}');
+    export default __binding;
   `;
 }
