@@ -19,7 +19,6 @@ services:
       # custom configurations
       - ${UPLOAD_LOCATION}:/root/.affine/storage
       - ${CONFIG_LOCATION}:/root/.affine/config
-      - ../../packages/backend/server/dist:/app/dist:ro
     env_file:
       - .env
     environment:
@@ -82,7 +81,6 @@ services:
       # custom configurations
       - ${UPLOAD_LOCATION}:/root/.affine/storage
       - ${CONFIG_LOCATION}:/root/.affine/config
-      - ../../packages/backend/server/dist:/app/dist:ro
     command: [ 'sh', '-c', 'node ./scripts/self-host-predeploy.js' ]
     env_file:
       - .env
