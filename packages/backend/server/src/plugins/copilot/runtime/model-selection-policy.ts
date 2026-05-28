@@ -66,7 +66,15 @@ export class ModelSelectionPolicy {
       availableProviderIds,
     });
     
-    if (resolved.candidateProviderIds.length === 0) {
+    const matchingProviderIds = resolved.candidateProviderIds.filter(providerId => {
+      const profile = registry.profiles.get(providerId);
+      if (!profile) return false;
+      const provider = factory.getProviderByProfile(providerId, profile);
+      if (!provider) return false;
+      return !!provider.resolveModel(selectedModel, { providerId, profile });
+    });
+    
+    if (matchingProviderIds.length === 0) {
       const fallbackModel = registry.defaults?.text || registry.defaults?.fallback || 'gemini-2.5-flash';
       selectedModel = fallbackModel;
     }

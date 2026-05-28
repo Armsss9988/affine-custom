@@ -84,7 +84,7 @@ export class CopilotProviderFactory {
     return this.registries.getRegistry();
   }
 
-  private getProviderByProfile(
+  getProviderByProfile(
     providerId: string,
     profile: NormalizedCopilotProviderProfile
   ) {
