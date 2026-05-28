@@ -642,17 +642,20 @@ export class PlaygroundPreview extends SignalWatcher(
     let pyStdout = '';
     let pyStderr = '';
     
+    const decoder = new TextDecoder();
     pyodide.setStdout({
-      write: (text: string) => {
+      write: (buffer: any) => {
+        const text = typeof buffer === 'string' ? buffer : decoder.decode(buffer);
         pyStdout += text;
-        return text.length;
+        return buffer.length;
       },
     });
     
     pyodide.setStderr({
-      write: (text: string) => {
+      write: (buffer: any) => {
+        const text = typeof buffer === 'string' ? buffer : decoder.decode(buffer);
         pyStderr += text;
-        return text.length;
+        return buffer.length;
       },
     });
 
