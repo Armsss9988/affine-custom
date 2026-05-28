@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 
 import { CopilotSessionInvalidInput } from '../../../base';
 import { llmResolveRequestedModelMatch } from '../../../native';
 import { CopilotProviderRegistryService } from '../providers/registry-service';
+import { CopilotProviderFactory } from '../providers/factory';
 
 import { ModelOutputType } from '../providers/types';
 import { resolveModel } from '../providers/provider-registry';
@@ -15,7 +17,10 @@ export type ResolveModelInput = {
 
 @Injectable()
 export class ModelSelectionPolicy {
-  constructor(private readonly registries: CopilotProviderRegistryService) {}
+  constructor(
+    private readonly registries: CopilotProviderRegistryService,
+    private readonly moduleRef: ModuleRef
+  ) {}
 
   private getRegistry() {
     return this.registries.getRegistry();
@@ -51,10 +56,14 @@ export class ModelSelectionPolicy {
     let selectedModel = matched.selectedModel ?? input.defaultModel;
     
     // Check if the resolved model actually has any compatible providers
+    const factory = this.moduleRef.get(CopilotProviderFactory, { strict: false });
+    const availableProviderIds = factory.getAvailableProviderIds(registry);
+    
     const resolved = resolveModel({
       registry,
       modelId: selectedModel,
       outputType: ModelOutputType.Text,
+      availableProviderIds,
     });
     
     if (resolved.candidateProviderIds.length === 0) {

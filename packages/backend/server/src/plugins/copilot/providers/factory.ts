@@ -103,7 +103,7 @@ export class CopilotProviderFactory {
     return !!this.getProviderByProfile(providerId, profile);
   }
 
-  private getAvailableProviderIds(registry: CopilotProviderRegistry) {
+  getAvailableProviderIds(registry: CopilotProviderRegistry) {
     return Array.from(registry.profiles.entries())
       .filter(([providerId, profile]) =>
         this.providerAvailable(providerId, profile)
