@@ -57,6 +57,51 @@ function loadMonaco(): Promise<any> {
   return monacoLoadingPromise;
 }
 
+// Pyodide dynamic CDN loader
+let pyodideInstance: any = null;
+let pyodideLoadingPromise: Promise<any> | null = null;
+function loadPyodide(): Promise<any> {
+  if (pyodideInstance) return Promise.resolve(pyodideInstance);
+  if (pyodideLoadingPromise) return pyodideLoadingPromise;
+
+  pyodideLoadingPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js';
+    script.onload = async () => {
+      try {
+        const loadPyodideFn = (window as any).loadPyodide;
+        pyodideInstance = await loadPyodideFn({
+          indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/',
+        });
+        resolve(pyodideInstance);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    script.onerror = err => reject(err);
+    document.body.appendChild(script);
+  });
+
+  return pyodideLoadingPromise;
+}
+
+// TypeScript dynamic CDN loader
+let tsLoadingPromise: Promise<any> | null = null;
+function loadTypeScriptTranspiler(): Promise<any> {
+  if ((window as any).ts) return Promise.resolve((window as any).ts);
+  if (tsLoadingPromise) return tsLoadingPromise;
+
+  tsLoadingPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/typescript/5.0.4/typescript.min.js';
+    script.onload = () => resolve((window as any).ts);
+    script.onerror = err => reject(err);
+    document.body.appendChild(script);
+  });
+
+  return tsLoadingPromise;
+}
+
 export class PlaygroundPreview extends SignalWatcher(
   WithDisposable(ShadowlessElement)
 ) {
@@ -479,11 +524,167 @@ export class PlaygroundPreview extends SignalWatcher(
     this.executionState = 'idle';
   }
 
+  private async _runJSOrTSInBrowser(code: string, isTS: boolean) {
+    let jsCode = code;
+    if (isTS) {
+      this.consoleWelcomeMsg = 'Loading TypeScript compiler...';
+      try {
+        await loadTypeScriptTranspiler();
+        const ts = (window as any).ts;
+        const result = ts.transpileModule(code, {
+          compilerOptions: {
+            module: 1,
+            target: 2,
+          },
+        });
+        jsCode = result.outputText;
+      } catch (err: any) {
+        this.stderr = `TypeScript Compilation Error: ${err.message}`;
+        this.executionState = 'error';
+        this.consoleWelcomeMsg = '';
+        return;
+      }
+    }
+
+    this.consoleWelcomeMsg = 'Executing JavaScript sandbox...';
+
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.sandbox = 'allow-scripts';
+    document.body.appendChild(iframe);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body>
+        <script>
+          const logs = [];
+          const errors = [];
+          
+          const originalLog = console.log;
+          console.log = (...args) => {
+            logs.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
+            originalLog.apply(console, args);
+          };
+          console.error = (...args) => {
+            errors.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
+          };
+          window.onerror = (message) => {
+            errors.push(message);
+          };
+
+          window.addEventListener('message', (e) => {
+            const { jsCode } = e.data;
+            const startTime = performance.now();
+            try {
+              const fn = new Function(jsCode);
+              fn();
+              const time = Math.round(performance.now() - startTime);
+              window.parent.postMessage({ type: 'js-exec-result', logs, errors, time }, '*');
+            } catch (err) {
+              errors.push(err.message);
+              const time = Math.round(performance.now() - startTime);
+              window.parent.postMessage({ type: 'js-exec-result', logs, errors, time }, '*');
+            }
+          });
+        </script>
+      </body>
+      </html>
+    `;
+
+    return new Promise<void>((resolve) => {
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener('message', listener);
+        iframe.remove();
+        this.stderr = 'Execution Timeout: Code execution exceeded 5 seconds.';
+        this.executionState = 'error';
+        this.consoleWelcomeMsg = '';
+        resolve();
+      }, 5000);
+
+      const listener = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'js-exec-result') {
+          clearTimeout(timeoutId);
+          const { logs, errors, time } = event.data;
+          this.stdout = logs.join('\n');
+          if (errors.length > 0) {
+            this.stderr = errors.join('\n');
+            this.executionState = 'error';
+          } else {
+            this.executionState = 'success';
+            if (!this.stdout) {
+              this.stdout = 'Program finished executing (no output).';
+            }
+          }
+          this.execTime = `${time} ms`;
+          this.execMemory = 'N/A (Browser Client)';
+          this.consoleWelcomeMsg = '';
+
+          window.removeEventListener('message', listener);
+          iframe.remove();
+          resolve();
+        }
+      };
+
+      window.addEventListener('message', listener);
+      iframe.onload = () => {
+        iframe.contentWindow?.postMessage({ jsCode }, '*');
+      };
+      iframe.srcdoc = htmlContent;
+    });
+  }
+
+  private async _runPythonInBrowser(code: string) {
+    this.consoleWelcomeMsg = 'Loading Python engine (WebAssembly)...';
+    const pyodide = await loadPyodide();
+    
+    let pyStdout = '';
+    let pyStderr = '';
+    
+    pyodide.setStdout({
+      write: (text: string) => {
+        pyStdout += text;
+        return text.length;
+      },
+    });
+    
+    pyodide.setStderr({
+      write: (text: string) => {
+        pyStderr += text;
+        return text.length;
+      },
+    });
+
+    this.consoleWelcomeMsg = 'Executing Python code...';
+    const startTime = performance.now();
+    try {
+      await pyodide.runPythonAsync(code);
+      this.stdout = pyStdout;
+      if (pyStderr) {
+        this.stderr = pyStderr;
+        this.executionState = 'error';
+      } else {
+        this.executionState = 'success';
+        if (!this.stdout) {
+          this.stdout = 'Program finished executing (no output).';
+        }
+      }
+    } catch (err: any) {
+      this.stderr = pyStderr ? `${pyStderr}\n${err.message}` : err.message;
+      this.executionState = 'error';
+    } finally {
+      const duration = Math.round(performance.now() - startTime);
+      this.execTime = `${duration} ms`;
+      this.execMemory = 'N/A (WebAssembly)';
+      this.consoleWelcomeMsg = '';
+    }
+  }
+
   private async _runCode() {
     if (this.executionState === 'running') return;
 
     this.executionState = 'running';
-    this.consoleWelcomeMsg = 'Submitting code to Judge0 sandbox...';
     this.stdout = '';
     this.stderr = '';
     this.compileOutput = '';
@@ -493,6 +694,36 @@ export class PlaygroundPreview extends SignalWatcher(
     const code = this._editorInstance
       ? this._editorInstance.getValue()
       : (this.model?.props.text.toString() ?? '');
+
+    const isDefaultEndpoint = this.apiEndpoint.includes('localhost:2358');
+
+    // 1. If it's JS/TS/Python and using default endpoint, execute in-browser
+    if (isDefaultEndpoint && ['javascript', 'typescript', 'python'].includes(this.lang)) {
+      this.consoleWelcomeMsg = `Running in browser sandbox (${this.lang === 'python' ? 'WebAssembly' : 'iframe'})...`;
+      try {
+        if (this.lang === 'python') {
+          await this._runPythonInBrowser(code);
+        } else {
+          await this._runJSOrTSInBrowser(code, this.lang === 'typescript');
+        }
+      } catch (err: any) {
+        this.stderr = `Browser Sandbox Execution Failed: ${err.message}`;
+        this.executionState = 'error';
+        this.consoleWelcomeMsg = '';
+      }
+      return;
+    }
+
+    // 2. For non-supported languages with default endpoint, fail gracefully with clean instructions
+    if (isDefaultEndpoint && !['javascript', 'typescript', 'python'].includes(this.lang)) {
+      this.stderr = `Execution Failed: No Judge0 sandbox is running at ${this.apiEndpoint}.\n\nTo execute ${this.lang.toUpperCase()} code:\n1. Spin up a Judge0 service on your local machine, OR\n2. Click the Gear Icon ⚙️ (Playground Settings) next to the Run button to configure a remote Judge0 API endpoint and token.`;
+      this.executionState = 'error';
+      this.consoleWelcomeMsg = '';
+      return;
+    }
+
+    // 3. Otherwise submit to configured Judge0 endpoint
+    this.consoleWelcomeMsg = 'Submitting code to Judge0 sandbox...';
     const judgeLangId = JUDGE0_LANG_IDS[this.lang] || 71; // Fallback to Python if undefined
 
     try {
