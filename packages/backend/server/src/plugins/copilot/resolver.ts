@@ -561,13 +561,15 @@ export class CopilotResolver {
       )
       .filter((history): history is ChatHistory => !!history);
 
-    return histories.map(h => ({
-      ...h,
-      // filter out empty messages
-      messages: h.messages.filter(
-        m => m.content || m.attachments?.length
-      ) as ChatMessageType[],
-    }));
+    return histories
+      .map(h => ({
+        ...h,
+        // filter out empty messages
+        messages: h.messages.filter(
+          m => m.content || m.attachments?.length
+        ) as ChatMessageType[],
+      }))
+      .filter(h => h.messages.length > 0);
   }
 
   @ResolveField(() => PaginatedCopilotHistoriesType, {})
@@ -613,14 +615,18 @@ export class CopilotResolver {
             : [];
         });
 
-    return paginate(
-      histories.map(h => ({
+    const filteredHistories = histories
+      .map(h => ({
         ...h,
         // filter out empty messages
         messages: h.messages.filter(
           m => m.content || m.attachments?.length
         ) as ChatMessageType[],
-      })),
+      }))
+      .filter(h => (options?.withMessages ? h.messages.length > 0 : true));
+
+    return paginate(
+      filteredHistories,
       'updatedAt',
       pagination,
       totalCount

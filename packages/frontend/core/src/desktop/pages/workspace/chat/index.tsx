@@ -57,6 +57,23 @@ import * as styles from './index.css';
 
 type CopilotSession = NonNullable<Awaited<ReturnType<CopilotClient['getSession']>>>;
 
+const createPlaceholderNewSession = (): CopilotSession => ({
+  sessionId: 'new',
+  workspaceId: '',
+  docId: null,
+  parentSessionId: null,
+  promptName: 'Chat With AFFiNE AI',
+  model: '',
+  optionalModels: [],
+  action: null,
+  pinned: false,
+  title: 'New chat',
+  tokens: 0,
+  messages: [],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
 // Module-level caches so chat state survives route unmount/remount cycles.
 // Keyed by workspaceId to avoid cross-workspace conflicts.
 const _chatContentMaps = new Map<string, Map<string, AIChatContent>>();
@@ -187,7 +204,7 @@ export const Component = () => {
         if (next.length) {
           workspaceLocalState.set(
             AI_CHAT_OPEN_TABS_KEY,
-            next.map(tab => tab.sessionId)
+            next.map(tab => tab.sessionId).filter(id => id !== 'new')
           );
         } else {
           workspaceLocalState.del(AI_CHAT_OPEN_TABS_KEY);
@@ -207,7 +224,7 @@ export const Component = () => {
 
   const createSession = useCallback(
     async (options: Partial<BlockSuitePresets.AICreateSessionOptions> = {}) => {
-      if (currentSession) {
+      if (currentSession && currentSession.sessionId !== 'new') {
         return currentSession;
       }
       const session = await client.createSessionWithHistory({
@@ -216,10 +233,19 @@ export const Component = () => {
         reuseLatestChat: false,
         ...options,
       });
+      setOpenTabs(prev => {
+        const existingNewIndex = prev.findIndex(t => t.sessionId === 'new');
+        if (existingNewIndex !== -1) {
+          const next = prev.slice();
+          next[existingNewIndex] = session;
+          return next;
+        }
+        return [...prev, session];
+      });
       setCurrentSession(session);
       return session;
     },
-    [client, currentSession, workspaceId]
+    [client, currentSession, workspaceId, setOpenTabs]
   );
 
   const togglePin = useCallback(async () => {
@@ -227,7 +253,7 @@ export const Component = () => {
     setIsTogglingPin(true);
     try {
       const pinned = !currentSession?.pinned;
-      if (!currentSession) {
+      if (!currentSession || currentSession.sessionId === 'new') {
         await createSession({ pinned });
       } else {
         await client.updateSession({
@@ -258,19 +284,13 @@ export const Component = () => {
     setIsOpeningSession(true);
     try {
       hideCachedContent();
-      setCurrentSession(null);
-      const session = await client.createSessionWithHistory({
-        workspaceId,
-        promptName: 'Chat With AFFiNE AI' satisfies PromptKey,
-        reuseLatestChat: false,
-      });
-      setCurrentSession(session);
+      setCurrentSession(createPlaceholderNewSession());
     } catch (error) {
       console.error(error);
     } finally {
       setIsOpeningSession(false);
     }
-  }, [client, hideCachedContent, isOpeningSession, workspaceId]);
+  }, [hideCachedContent, isOpeningSession]);
 
   const onOpenSession = useCallback(
     async (sessionId: string) => {
@@ -723,22 +743,25 @@ export const Component = () => {
           return;
         }
         const pinnedSession = sessions[0];
-        if (!pinnedSession) {
+        if (pinnedSession) {
+          let shouldRemount = false;
+          setCurrentSession(prev => {
+            if (prev) return prev;
+            shouldRemount = true;
+            return pinnedSession;
+          });
+          if (shouldRemount) hideCachedContent();
           return;
         }
-
-        let shouldRemount = false;
-        setCurrentSession(prev => {
-          if (prev) return prev;
-          shouldRemount = true;
-          return pinnedSession;
-        });
-        if (shouldRemount) hideCachedContent();
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
         console.error(error);
+      }
+
+      if (!controller.signal.aborted) {
+        setCurrentSession(prev => prev || createPlaceholderNewSession());
       }
     };
 

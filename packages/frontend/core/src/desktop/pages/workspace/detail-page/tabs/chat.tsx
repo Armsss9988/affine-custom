@@ -316,28 +316,9 @@ export const EditorChatPanel = ({ editor, onLoad }: SidebarTabProps) => {
 
   const newSession = useCallback(async () => {
     resetPanel();
-    const requestSeq = sessionLoadSeqRef.current;
     setSession(null);
-
-    if (!AIProvider.session || !doc) {
-      return;
-    }
-
-    try {
-      const nextSession = await AIProvider.session.createSessionWithHistory({
-        docId: doc.id,
-        workspaceId: doc.workspace.id,
-        promptName: 'Chat With AFFiNE AI',
-        reuseLatestChat: false,
-      });
-      if (requestSeq === sessionLoadSeqRef.current) {
-        setSession(nextSession ?? null);
-        setHasPinned(!!nextSession?.pinned);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }, [doc, resetPanel]);
+    setHasPinned(false);
+  }, [resetPanel]);
 
   const openSession = useCallback(
     async (sessionId: string) => {
