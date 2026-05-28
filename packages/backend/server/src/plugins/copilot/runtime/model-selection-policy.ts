@@ -4,6 +4,9 @@ import { CopilotSessionInvalidInput } from '../../../base';
 import { llmResolveRequestedModelMatch } from '../../../native';
 import { CopilotProviderRegistryService } from '../providers/registry-service';
 
+import { ModelOutputType } from '../providers/types';
+import { resolveModel } from '../providers/provider-registry';
+
 export type ResolveModelInput = {
   defaultModel: string;
   optionalModels?: string[] | null;
@@ -43,8 +46,24 @@ export class ModelSelectionPolicy {
       input.requestedModelId,
       input.defaultModel
     );
+    
+    const registry = this.getRegistry();
+    let selectedModel = matched.selectedModel ?? input.defaultModel;
+    
+    // Check if the resolved model actually has any compatible providers
+    const resolved = resolveModel({
+      registry,
+      modelId: selectedModel,
+      outputType: ModelOutputType.Text,
+    });
+    
+    if (resolved.candidateProviderIds.length === 0) {
+      const fallbackModel = registry.defaults?.text || registry.defaults?.fallback || 'gemini-2.5-flash';
+      selectedModel = fallbackModel;
+    }
+    
     return {
-      selectedModel: matched.selectedModel ?? input.defaultModel,
+      selectedModel,
       matchedOptionalModel: matched.matchedOptionalModel,
     };
   }

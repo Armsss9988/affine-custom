@@ -531,7 +531,7 @@ export class PlaygroundPreview extends SignalWatcher(
 
       // 2. Poll submission status
       this.consoleWelcomeMsg = 'Code submitted. Running sandbox environment...';
-      this._pollStatus(token);
+      await this._pollStatus(token);
     } catch (err: any) {
       console.error('Submission failed:', err);
       this.consoleWelcomeMsg = '';
@@ -560,7 +560,11 @@ export class PlaygroundPreview extends SignalWatcher(
 
       if (statusId === 1 || statusId === 2) {
         // Status: 1 (In Queue), 2 (Processing) -> Poll again after 800ms
-        setTimeout(() => this._pollStatus(token), 800);
+        setTimeout(() => {
+          this._pollStatus(token).catch(err => {
+            console.error('Failed to poll status:', err);
+          });
+        }, 800);
       } else {
         // Finished executing! Decode and display results
         this.consoleWelcomeMsg = '';
