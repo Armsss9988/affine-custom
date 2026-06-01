@@ -20,14 +20,14 @@
     "scenarios": {
       "override_enabled": true,
       "scenarios": {
-        "audio_transcribing": "gpt-4o",
-        "chat": "gemini-1.5-flash",
-        "chat_with_doc": "gemini-1.5-flash",
-        "copilot_doc": "gemini-1.5-flash",
-        "embedding": "text-embedding-3-large",
-        "ocr": "gpt-4o",
-        "summary": "gemini-1.5-flash",
-        "translation": "gemini-1.5-flash"
+        "audio_transcribing": "gemini-3.5-flash",
+        "chat": "gemini-3.5-flash",
+        "chat_with_doc": "gemini-3.5-flash",
+        "copilot_doc": "gemini-3.5-flash",
+        "embedding": "text-embedding-004",
+        "ocr": "gemini-3.5-flash",
+        "summary": "gemini-3.5-flash",
+        "translation": "gemini-3.5-flash"
       }
     }
   }

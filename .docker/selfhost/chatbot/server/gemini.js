@@ -15,7 +15,7 @@ const https = require('https');
 
 const VERTEX_PROJECT   = process.env.VERTEX_PROJECT   || '';
 const VERTEX_LOCATION  = process.env.VERTEX_LOCATION  || 'us-central1';
-const GEMINI_MODEL     = process.env.GEMINI_LLM_MODEL  || 'gemini-2.0-flash';
+const GEMINI_MODEL     = process.env.GEMINI_LLM_MODEL  || 'gemini-3.5-flash';
 
 // Scopes required for Vertex AI
 const VERTEX_SCOPES = ['https://www.googleapis.com/auth/cloud-platform'];

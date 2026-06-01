@@ -178,7 +178,7 @@ function genResponseId() {
 // 1. Models Endpoint — advertise both NIM + Gemini models
 router.get('/models', (req, res) => {
   const ts = Math.floor(Date.now() / 1000);
-  const geminiModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'text-embedding-004', 'gemini-embedding-001'];
+  const geminiModels = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'text-embedding-004', 'gemini-embedding-001'];
   const nimAliases = ['gpt-4o', 'gpt-4o-mini', 'text-embedding-3-small'];
   
   console.log(`[Models Endpoint] req.originalUrl=${req.originalUrl}, req.baseUrl=${req.baseUrl}`);
