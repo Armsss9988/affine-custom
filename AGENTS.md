@@ -74,3 +74,44 @@ Test files: `*.spec.{ts,tsx}`.
 | BE models | `packages/backend/server/src/models/` |
 | Prisma schema | `packages/backend/server/schema.prisma` |
 | GraphQL client | `packages/common/graphql/src/` |
+
+## VPS / Production Deployment
+
+| Item | Value |
+|---|---|
+| **VPS IP** | `168.138.167.9` |
+| **SSH User** | `opc` |
+| **SSH Key** | `~/.ssh/oracle_affine` |
+| **SSH Command** | `ssh -i ~/.ssh/oracle_affine opc@168.138.167.9` |
+| **App Dir on VPS** | `/opt/affine-custom/.docker/selfhost/` |
+| **Docker Compose Dir** | `/opt/affine-custom/.docker/selfhost/` |
+| **Public URL** | `https://affine.armsss.online` |
+| **GCP Project** | `gen-lang-client-0208585583` |
+
+### Chatbot Proxy Stack
+
+| Item | Value |
+|---|---|
+| **Chatbot Port** | `3099` |
+| **NIM LLM** | `stepfun-ai/step-3.5-flash` via `https://integrate.api.nvidia.com/v1` |
+| **Gemini LLM** | `gemini-3.5-flash` via Vertex AI (ADC) |
+| **Routing** | `gemini-*` → Vertex AI; others → NIM |
+| **ADC Credentials** | `~/.config/gcloud/application_default_credentials.json` (mounted into container) |
+
+### Deploy Commands
+
+```bash
+# SSH vào VPS
+ssh -i ~/.ssh/oracle_affine opc@168.138.167.9
+
+# Pull + restart chatbot
+cd /opt/affine-custom/.docker/selfhost
+git pull origin main
+docker compose up -d --no-deps chatbot
+
+# Xem logs chatbot
+docker compose logs -f chatbot
+
+# Restart toàn bộ stack
+docker compose up -d
+```
