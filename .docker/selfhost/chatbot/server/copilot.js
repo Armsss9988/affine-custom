@@ -819,19 +819,14 @@ router.post('/models/:modelName\\::action', async (req, res) => {
 
       // If real Gemini model + Vertex configured, proxy directly in Gemini format
       if (useGeminiBackend) {
-        const { geminiChatStream: gs } = require('./gemini');
-        // Re-import is fine (Node.js caches modules)
-        // Build the full Gemini request body and forward it
-        const { getAccessToken, GEMINI_MODEL: GM } = require('./gemini');
+        const { getAccessToken, getVertexEndpoint } = require('./gemini');
         const accessToken = await getAccessToken();
-        const project = process.env.VERTEX_PROJECT;
-        const location = process.env.VERTEX_LOCATION || 'us-central1';
         const https2 = require('https');
         const fwdBody = JSON.stringify(req.body);
-        const endpoint = `/${location}-aiplatform.googleapis.com`;
+        const { hostname, path: urlPath } = getVertexEndpoint(modelName, 'streamGenerateContent');
         const fwdReq = https2.request({
-          hostname: `${location}-aiplatform.googleapis.com`,
-          path: `/v1/projects/${project}/locations/${location}/publishers/google/models/${modelName}:streamGenerateContent?alt=sse`,
+          hostname,
+          path: `${urlPath}?alt=sse`,
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -971,17 +966,15 @@ router.post('/models/:modelName\\::action', async (req, res) => {
     } else {
       // Non-streaming: use Gemini directly if applicable
       if (useGeminiBackend) {
-        const { geminiChatComplete: gcc } = require('./gemini');
-        const { getAccessToken } = require('./gemini');
+        const { getAccessToken, getVertexEndpoint } = require('./gemini');
         const accessToken = await getAccessToken();
-        const project = process.env.VERTEX_PROJECT;
-        const location = process.env.VERTEX_LOCATION || 'us-central1';
         const https2 = require('https');
         const fwdBody = JSON.stringify(req.body);
+        const { hostname, path: urlPath } = getVertexEndpoint(modelName, 'generateContent');
         await new Promise((resolve, reject) => {
           const fwdReq = https2.request({
-            hostname: `${location}-aiplatform.googleapis.com`,
-            path: `/v1/projects/${project}/locations/${location}/publishers/google/models/${modelName}:generateContent`,
+            hostname,
+            path: urlPath,
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

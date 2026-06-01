@@ -409,4 +409,4 @@ async function testADC() {
 // Run health check at startup (non-blocking)
 testADC();
 
-module.exports = { geminiChatStream, geminiChatComplete, geminiEmbedText, getAccessToken, GEMINI_MODEL };
+module.exports = { geminiChatStream, geminiChatComplete, geminiEmbedText, getAccessToken, GEMINI_MODEL, getVertexEndpoint };
