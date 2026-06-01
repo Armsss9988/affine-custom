@@ -20,6 +20,7 @@ services:
       - ${UPLOAD_LOCATION}:/root/.affine/storage
       - ${CONFIG_LOCATION}:/root/.affine/config
       - ../../packages/backend/server/dist:/app/dist:ro
+      - ../../packages/frontend/apps/web/dist:/app/static:ro
     env_file:
       - .env
     environment:
