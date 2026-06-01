@@ -168,7 +168,7 @@ function toGeminiContents(messages) {
     if (m.role === 'tool') {
       contents.push({
         role: 'user',
-        parts: [{ functionResponse: { name: m.tool_call_id || 'tool', response: safeParseJson(m.content) } }],
+        parts: [{ functionResponse: { name: m.name || m.tool_call_id || 'tool', response: safeParseJson(m.content) } }],
       });
       continue;
     }
@@ -191,7 +191,18 @@ function toGeminiContents(messages) {
 }
 
 function safeParseJson(str) {
-  try { return JSON.parse(str); } catch { return { value: str }; }
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed === null || typeof parsed !== 'object') {
+      return { result: parsed };
+    }
+    if (Array.isArray(parsed)) {
+      return { result: parsed };
+    }
+    return parsed;
+  } catch {
+    return { result: str };
+  }
 }
 
 // ─── Convert OpenAI tools → Gemini functionDeclarations ─────────────────────
