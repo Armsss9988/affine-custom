@@ -175,9 +175,15 @@ function toGeminiContents(messages) {
     if (m.tool_calls) {
       contents.push({
         role: 'model',
-        parts: m.tool_calls.map(tc => ({
-          functionCall: { name: tc.function.name, args: safeParseJson(tc.function.arguments) },
-        })),
+        parts: m.tool_calls.map(tc => {
+          const part = {
+            functionCall: { name: tc.function.name, args: safeParseJson(tc.function.arguments) }
+          };
+          if (tc.thought_signature) {
+            part.thoughtSignature = tc.thought_signature;
+          }
+          return part;
+        }),
       });
       continue;
     }
@@ -232,6 +238,7 @@ function geminiChunkToOpenAI(candidate, model) {
       id: `call_${p.functionCall.name}_${Date.now()}`,
       type: 'function',
       function: { name: p.functionCall.name, arguments: JSON.stringify(p.functionCall.args || {}) },
+      thought_signature: p.thoughtSignature || p.thought_signature || null,
     }));
   }
 

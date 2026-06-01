@@ -1006,6 +1006,7 @@ Only output the final response back to the user after completing all tool calls.
                     }
                     if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
                     if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                    if (tc.thought_signature) toolCalls[idx].thought_signature = tc.thought_signature;
                   }
                 }
               } catch (e) {
@@ -1037,6 +1038,7 @@ Only output the final response back to the user after completing all tool calls.
                       }
                       if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
                       if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                      if (tc.thought_signature) toolCalls[idx].thought_signature = tc.thought_signature;
                     }
                   }
                 } catch (e) {
