@@ -10,13 +10,48 @@ export class GeminiVertexProvider extends GeminiProvider<GeminiVertexConfig> {
   override readonly type = CopilotProviderType.GeminiVertex;
   override configured(execution?: CopilotProviderExecution): boolean {
     const config = this.getConfig(execution);
+    const location = config.location || process.env.VERTEX_LOCATION;
+    const googleAuthOptions =
+      config.googleAuthOptions || process.env.VERTEX_AUTH_TOKEN;
+    const clientEmail = process.env.VERTEX_CLIENT_EMAIL;
+    const privateKey = process.env.VERTEX_PRIVATE_KEY;
+    const project = config.project || process.env.VERTEX_PROJECT;
+
     return (
-      !!config.location &&
-      (!!config.googleAuthOptions || typeof config.googleAuthOptions === 'string')
+      !!location &&
+      (!!googleAuthOptions || (!!clientEmail && !!privateKey && !!project))
     );
   }
+
   protected async resolveVertexAuth(execution?: CopilotProviderExecution) {
-    return await getGoogleAuth(this.getConfig(execution), 'google');
+    const config = this.getConfig(execution);
+    const location = config.location || process.env.VERTEX_LOCATION;
+    const project = config.project || process.env.VERTEX_PROJECT;
+    let googleAuthOptions =
+      config.googleAuthOptions || process.env.VERTEX_AUTH_TOKEN;
+
+    if (
+      !googleAuthOptions &&
+      process.env.VERTEX_CLIENT_EMAIL &&
+      process.env.VERTEX_PRIVATE_KEY
+    ) {
+      googleAuthOptions = {
+        credentials: {
+          client_email: process.env.VERTEX_CLIENT_EMAIL,
+          private_key: process.env.VERTEX_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        },
+      };
+    }
+
+    return await getGoogleAuth(
+      {
+        ...config,
+        location,
+        project,
+        googleAuthOptions,
+      },
+      'google'
+    );
   }
 
   protected override async createNativeConfig(

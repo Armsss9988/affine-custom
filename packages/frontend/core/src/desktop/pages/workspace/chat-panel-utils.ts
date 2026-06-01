@@ -41,7 +41,18 @@ export function useAIChatOpenTabs<T extends { sessionId: string }>(
       .then(results => {
         if (cancelled) return;
         const valid = (results as (T | null | undefined)[]).filter(
-          (entry): entry is T => !!entry && !!entry.sessionId
+          (entry): entry is T => {
+            if (!entry || !entry.sessionId) return false;
+            const hasMessages = !!(
+              (entry as any).messages && (entry as any).messages.length > 0
+            );
+            const hasCustomTitle = !!(
+              (entry as any).title &&
+              (entry as any).title !== 'New chat' &&
+              (entry as any).title !== 'Chat With AFFiNE AI'
+            );
+            return hasMessages || hasCustomTitle;
+          }
         );
         if (valid.length) setOpenTabsState(valid);
         hydratedRef.current = true;
@@ -64,11 +75,11 @@ export function useAIChatOpenTabs<T extends { sessionId: string }>(
             ? (updater as (p: T[]) => T[])(prev)
             : updater;
         if (hydratedRef.current) {
-          if (next.length) {
-            workspaceLocalState.set(
-              AI_CHAT_OPEN_TABS_KEY,
-              next.map(tab => tab.sessionId)
-            );
+          const toSave = next
+            .map(tab => tab.sessionId)
+            .filter(id => id !== 'new');
+          if (toSave.length) {
+            workspaceLocalState.set(AI_CHAT_OPEN_TABS_KEY, toSave);
           } else {
             workspaceLocalState.del(AI_CHAT_OPEN_TABS_KEY);
           }

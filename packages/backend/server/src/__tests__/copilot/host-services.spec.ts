@@ -123,10 +123,7 @@ for (const matrixCase of turnRouteAccessCases) {
   test(`CopilotAccessPolicy resolve turn route access: ${matrixCase.name}`, async t => {
     const checkQuota = Sinon.stub().rejects(new Error('quota exceeded'));
     const getProfiles = Sinon.stub().resolves(matrixCase.profiles);
-    const access = new CopilotAccessPolicy(
-      { checkQuota } as any,
-      { getProfiles } as any
-    );
+    const access = new CopilotAccessPolicy({ getProfiles } as any);
 
     const promise = access.resolveTurnRouteAccess({
       userId: 'user-1',
@@ -179,10 +176,7 @@ const byokCoverageCases: ByokCoverageCase[] = [
 for (const matrixCase of byokCoverageCases) {
   test(`CopilotAccessPolicy should resolve BYOK coverage for ${matrixCase.featureKind ?? 'default'}`, async t => {
     const getProfiles = Sinon.stub().resolves([]);
-    const access = new CopilotAccessPolicy(
-      { hasQuota: Sinon.stub().resolves(true) } as any,
-      { getProfiles } as any
-    );
+    const access = new CopilotAccessPolicy({ getProfiles } as any);
 
     await access.getByokProfiles({
       userId: 'user-1',
@@ -201,10 +195,9 @@ for (const matrixCase of byokCoverageCases) {
 
 test('CopilotAccessPolicy assertQuotaOrByok should honor quota-backed route disable', async t => {
   const checkQuota = Sinon.stub().resolves(undefined);
-  const access = new CopilotAccessPolicy(
-    { checkQuota } as any,
-    { getProfiles: Sinon.stub().resolves([]) } as any
-  );
+  const access = new CopilotAccessPolicy({
+    getProfiles: Sinon.stub().resolves([]),
+  } as any);
 
   await t.throwsAsync(
     access.assertQuotaOrByok({
@@ -392,6 +385,7 @@ test('ToolRuntime should pass route context into prompt-backed tools', async t =
     {} as any,
     {} as any,
     {} as any,
+    {} as any, // storage
     {} as any,
     promptRuntime as any,
     {} as any
@@ -443,6 +437,7 @@ test('ToolRuntime should pass doc compose prompt into article generation', async
     {} as any,
     {} as any,
     {} as any,
+    {} as any, // storage
     {} as any,
     promptRuntime as any,
     {} as any
@@ -496,6 +491,7 @@ test('ToolRuntime should skip document lookup tools for local-only workspaces', 
     {} as any,
     {} as any,
     {} as any,
+    {} as any, // storage
     {
       workspace: {
         get: Sinon.stub().resolves(null),
@@ -533,6 +529,7 @@ for (const exaKey of ['', 'YOUR_EXA_API_KEY']) {
       {} as any,
       {} as any,
       {} as any,
+      {} as any, // storage
       {} as any,
       {} as any,
       {} as any
@@ -562,6 +559,7 @@ test('ToolRuntime should expose Exa web tools when key is configured', async t =
     {} as any,
     {} as any,
     {} as any,
+    {} as any, // storage
     {} as any,
     {} as any,
     {} as any

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pick } from 'lodash-es';
 import z from 'zod';
 import * as Y from 'yjs';
+import { nanoid } from 'nanoid';
 
 import {
   DocReader,
@@ -100,6 +101,412 @@ function defineTool<T extends z.ZodTypeAny>(
       return await config.execute(parsed.data, options);
     },
   };
+}
+
+// ─── Collection Helpers ──────────────────────────────────────────────────────
+interface CollectionItem {
+  id: string;
+  name: string;
+  allowList: string[];
+}
+
+function parseCollections(bin: Buffer | Uint8Array): CollectionItem[] {
+  try {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, bin);
+    const setting = doc.getMap('setting');
+    const collections = setting.get('collections');
+    if (!collections || !(collections instanceof Y.Array)) {
+      return [];
+    }
+
+    return collections.map(col => {
+      const toJSON = typeof col.toJSON === 'function' ? col.toJSON() : col;
+      return {
+        id: toJSON.id || '',
+        name: toJSON.name || toJSON.title || '',
+        allowList: toJSON.allowList || [],
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function buildCollectionUpdate(
+  existingBin: Buffer,
+  info: { id: string; name?: string; allowList?: string[] },
+  action: 'create' | 'delete' | 'update_allow_list'
+): Uint8Array {
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, existingBin);
+  const setting = doc.getMap('setting');
+  let collections = setting.get('collections');
+  if (!collections || !(collections instanceof Y.Array)) {
+    collections = new Y.Array<any>();
+    setting.set('collections', collections);
+  }
+
+  const collectionsArray = collections as Y.Array<any>;
+  doc.transact(() => {
+    if (action === 'create') {
+      const colMap = new Y.Map();
+      colMap.set('id', info.id);
+      colMap.set('name', info.name || '');
+      colMap.set('allowList', new Y.Array());
+      const rulesMap = new Y.Map();
+      rulesMap.set('filters', new Y.Array());
+      colMap.set('rules', rulesMap);
+      collectionsArray.push([colMap]);
+    } else if (action === 'delete') {
+      for (let i = 0; i < collectionsArray.length; i++) {
+        const col = collectionsArray.get(i);
+        const colId = typeof col.get === 'function' ? col.get('id') : col.id;
+        if (colId === info.id) {
+          collectionsArray.delete(i, 1);
+          break;
+        }
+      }
+    } else if (action === 'update_allow_list') {
+      for (let i = 0; i < collectionsArray.length; i++) {
+        const col = collectionsArray.get(i);
+        const colId = typeof col.get === 'function' ? col.get('id') : col.id;
+        if (colId === info.id) {
+          if (typeof col.set === 'function') {
+            const yAllow = new Y.Array();
+            yAllow.push(info.allowList || []);
+            col.set('allowList', yAllow);
+          } else {
+            col.allowList = info.allowList || [];
+          }
+          break;
+        }
+      }
+    }
+  });
+
+  return Y.encodeStateAsUpdate(doc);
+}
+
+// ─── Folder Helpers ──────────────────────────────────────────────────────────
+interface RawFolderNode {
+  id: string;
+  parentId: string | null;
+  data: string;
+  type: 'folder' | 'doc' | 'tag' | 'collection';
+  index: string;
+}
+
+interface FolderTreeItem {
+  id: string;
+  name?: string;
+  type: 'folder' | 'doc' | 'tag' | 'collection';
+  targetId?: string;
+  index: string;
+  children?: FolderTreeItem[];
+}
+
+function parseFolders(bin: Buffer | Uint8Array): RawFolderNode[] {
+  try {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, bin);
+    const result: RawFolderNode[] = [];
+
+    for (const key of doc.share.keys()) {
+      const record = doc.getMap(key);
+      if (record.get('$$DELETED') === true || record.size === 0) {
+        continue;
+      }
+
+      result.push({
+        id: (record.get('id') || key) as string,
+        parentId: record.get('parentId') as string | null,
+        data: (record.get('data') as string) || '',
+        type: (record.get('type') as any) || 'folder',
+        index: (record.get('index') as string) || '',
+      });
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+function buildFolderTree(nodes: RawFolderNode[]): FolderTreeItem[] {
+  const nodeMap = new Map<string, FolderTreeItem>();
+  const rootItems: FolderTreeItem[] = [];
+
+  for (const node of nodes) {
+    const item: FolderTreeItem = {
+      id: node.id,
+      type: node.type,
+      index: node.index,
+    };
+    if (node.type === 'folder') {
+      item.name = node.data;
+      item.children = [];
+    } else {
+      item.targetId = node.data;
+    }
+    nodeMap.set(node.id, item);
+  }
+
+  for (const node of nodes) {
+    const item = nodeMap.get(node.id)!;
+    if (node.parentId) {
+      const parent = nodeMap.get(node.parentId);
+      if (parent && parent.children) {
+        parent.children.push(item);
+      } else {
+        rootItems.push(item);
+      }
+    } else {
+      rootItems.push(item);
+    }
+  }
+
+  const sortFn = (a: FolderTreeItem, b: FolderTreeItem) =>
+    a.index.localeCompare(b.index);
+  rootItems.sort(sortFn);
+  for (const item of nodeMap.values()) {
+    if (item.children) {
+      item.children.sort(sortFn);
+    }
+  }
+
+  return rootItems;
+}
+
+function buildFolderUpdate(
+  existingBin: Buffer,
+  node: {
+    id: string;
+    parentId?: string | null;
+    data?: string;
+    type?: string;
+    index?: string;
+  },
+  isDelete = false
+): Uint8Array {
+  const doc = new Y.Doc();
+  if (existingBin.length > 0) {
+    Y.applyUpdate(doc, existingBin);
+  }
+  const record = doc.getMap(node.id);
+
+  doc.transact(() => {
+    if (isDelete) {
+      record.set('$$DELETED', true);
+      record.delete('parentId');
+      record.delete('data');
+      record.delete('type');
+      record.delete('index');
+    } else {
+      record.set('id', node.id);
+      if (node.parentId !== undefined) {
+        if (node.parentId === null) {
+          record.delete('parentId');
+        } else {
+          record.set('parentId', node.parentId);
+        }
+      }
+      if (node.data !== undefined) record.set('data', node.data);
+      if (node.type !== undefined) record.set('type', node.type);
+      if (node.index !== undefined) record.set('index', node.index);
+      record.delete('$$DELETED');
+    }
+  });
+
+  return Y.encodeStateAsUpdate(doc);
+}
+
+// ─── Search Helpers ──────────────────────────────────────────────────────────
+async function searchDuckDuckGo(query: string, numResults: number = 10) {
+  const res = await fetch('https://lite.duckduckgo.com/lite/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Mozilla/5.0 (compatible; AFFiNE-Research-Bot/1.0)',
+    },
+    body: `q=${encodeURIComponent(query)}`,
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`DuckDuckGo returned ${res.status}`);
+  const html = await res.text();
+
+  const results: Array<{
+    title: string;
+    url: string;
+    content: string;
+    engine: string;
+  }> = [];
+
+  const linkRegex =
+    /<a[^>]*class="result-link"[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi;
+  const snippetRegex = /<td[^>]*class="result-snippet"[^>]*>(.*?)<\/td>/gi;
+
+  const links: Array<{ url: string; title: string }> = [];
+  let linkMatch;
+  while ((linkMatch = linkRegex.exec(html)) !== null) {
+    links.push({
+      url: linkMatch[1],
+      title: linkMatch[2].replace(/<[^>]*>/g, '').trim(),
+    });
+  }
+
+  const snippets: string[] = [];
+  let snippetMatch;
+  while ((snippetMatch = snippetRegex.exec(html)) !== null) {
+    snippets.push(snippetMatch[1].replace(/<[^>]*>/g, '').trim());
+  }
+
+  if (links.length === 0) {
+    return await searchDuckDuckGoInstant(query, numResults);
+  }
+
+  for (let i = 0; i < Math.min(links.length, numResults); i++) {
+    results.push({
+      title: links[i].title,
+      url: links[i].url,
+      content: snippets[i] || '',
+      engine: 'duckduckgo',
+    });
+  }
+
+  return results;
+}
+
+async function searchDuckDuckGoInstant(query: string, numResults: number) {
+  const res = await fetch(
+    `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`,
+    {
+      headers: {
+        'User-Agent': 'AFFiNE-Research-Assistant/1.0',
+      },
+      signal: AbortSignal.timeout(10000),
+    }
+  );
+  if (!res.ok) throw new Error(`DuckDuckGo API returned ${res.status}`);
+  const data = (await res.json()) as any;
+
+  const results: Array<{
+    title: string;
+    url: string;
+    content: string;
+    engine: string;
+  }> = [];
+
+  if (data.Abstract) {
+    results.push({
+      title: data.Heading || query,
+      url: data.AbstractURL || '',
+      content: data.Abstract,
+      engine: 'duckduckgo',
+    });
+  }
+
+  if (data.RelatedTopics) {
+    for (const topic of data.RelatedTopics.slice(
+      0,
+      numResults - results.length
+    )) {
+      if (topic.Text && topic.FirstURL) {
+        results.push({
+          title: topic.Text.split(' - ')[0] || '',
+          url: topic.FirstURL,
+          content: topic.Text,
+          engine: 'duckduckgo',
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+// ─── URL Reader Helpers ──────────────────────────────────────────────────────
+function extractHtmlTag(html: string, tag: string): string {
+  const match = html.match(
+    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i')
+  );
+  return match ? match[1].replace(/<[^>]*>/g, '').trim() : '';
+}
+
+function extractMeta(html: string, name: string): string {
+  const match =
+    html.match(
+      new RegExp(
+        `<meta[^>]*(?:name|property)=["'](?:og:)?${name}["'][^>]*content=["']([^"']*)["']`,
+        'i'
+      )
+    ) ||
+    html.match(
+      new RegExp(
+        `<meta[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["'](?:og:)?${name}["']`,
+        'i'
+      )
+    );
+  return match ? match[1].trim() : '';
+}
+
+function htmlToCleanText(html: string, maxLength: number): string {
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  const mainMatch = text.match(
+    /<(?:main|article)[\s\S]*?>([\s\S]*?)<\/(?:main|article)>/i
+  );
+  if (mainMatch) {
+    text = mainMatch[1];
+  }
+
+  text = text
+    .replace(
+      /<h([1-6])[^>]*>(.*?)<\/h[1-6]>/gi,
+      (_: string, level: string, content: string) => {
+        return (
+          '\n' +
+          '#'.repeat(Number(level)) +
+          ' ' +
+          content.replace(/<[^>]*>/g, '').trim() +
+          '\n'
+        );
+      }
+    )
+    .replace(
+      /<p[^>]*>(.*?)<\/p>/gi,
+      (_: string, content: string) => '\n' + content + '\n'
+    )
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+    .replace(/<a[^>]*href=["']([^"']*)["'][^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+    .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+    .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+    .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+    .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+    .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+    .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n');
+
+  text = text.replace(/<[^>]*>/g, '');
+
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+  return text.slice(0, maxLength);
 }
 
 @Injectable()
@@ -247,7 +654,88 @@ export class WorkspaceMcpProvider {
       },
     });
 
-    const tools = [readDocument, semanticSearch, keywordSearch];
+    const listDocuments = defineTool({
+      name: 'list_documents',
+      title: 'List Documents',
+      description:
+        'List all documents in the workspace. Returns docId, title, createdAt, isJournal, and inTrash. Use this when the user asks to see all docs, find a doc by name, or browse the workspace contents.',
+      parser: z.object({
+        includeTrash: z.boolean().optional().default(false),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          includeTrash: {
+            type: 'boolean',
+            description:
+              'If true, also list docs currently in the trash. Default: false',
+          },
+        },
+        additionalProperties: false,
+      },
+      execute: async ({ includeTrash }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.Read');
+
+          const abortedAfterPermission = abortIfNeeded(options.signal);
+          if (abortedAfterPermission) return abortedAfterPermission;
+
+          const rootDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            workspaceId
+          );
+          if (!rootDoc?.bin) {
+            return toolText(JSON.stringify([]));
+          }
+
+          const buf = Buffer.isBuffer(rootDoc.bin)
+            ? rootDoc.bin
+            : Buffer.from(
+                rootDoc.bin.buffer,
+                rootDoc.bin.byteOffset,
+                rootDoc.bin.byteLength
+              );
+          const ydoc = new Y.Doc();
+          Y.applyUpdate(ydoc, buf);
+          const meta = ydoc.getMap('meta');
+          const pages = meta.get('pages') as
+            | Y.Array<Y.Map<unknown>>
+            | undefined;
+          if (!pages) {
+            return toolText(JSON.stringify([]));
+          }
+
+          const result: any[] = [];
+          pages.forEach((page: Y.Map<unknown>) => {
+            const trash = !!page.get('trash');
+            if (includeTrash || !trash) {
+              const createDate = page.get('createDate') as number | undefined;
+              result.push({
+                docId: page.get('id') as string,
+                title:
+                  (page.get('title') as string | undefined) || '(Untitled)',
+                createdAt: createDate
+                  ? new Date(createDate).toISOString()
+                  : null,
+                isJournal: !!page.get('isJournal'),
+                inTrash: trash,
+              });
+            }
+          });
+
+          return toolText(JSON.stringify(result, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to list documents: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const tools = [readDocument, semanticSearch, keywordSearch, listDocuments];
 
     const createDocument = defineTool({
       name: 'create_document',
@@ -656,7 +1144,7 @@ export class WorkspaceMcpProvider {
           .user(userId)
           .workspace(workspaceId)
           .doc(docId)
-          .can('Doc.Write');
+          .can('Doc.Update');
         if (!accessible) return toolError('Permission denied.');
 
         const aborted = abortIfNeeded(options.signal);
@@ -783,13 +1271,752 @@ export class WorkspaceMcpProvider {
       },
     });
 
+    const listCollections = defineTool({
+      name: 'list_collections',
+      title: 'List Collections',
+      description: 'List all custom collections in the workspace.',
+      parser: z.object({}),
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+      execute: async (_, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.Read');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const rootDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            workspaceId
+          );
+          if (!rootDoc?.bin) {
+            return toolText(JSON.stringify({ total: 0, collections: [] }));
+          }
+          const bin = Buffer.isBuffer(rootDoc.bin)
+            ? rootDoc.bin
+            : Buffer.from(
+                rootDoc.bin.buffer,
+                rootDoc.bin.byteOffset,
+                rootDoc.bin.byteLength
+              );
+
+          const collections = parseCollections(bin);
+          return toolText(
+            JSON.stringify({ total: collections.length, collections }, null, 2)
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to list collections: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const createCollection = defineTool({
+      name: 'create_collection',
+      title: 'Create Collection',
+      description:
+        'Create a new collection. Use this when the user asks to create or add a new collection.',
+      parser: z.object({ name: z.string().min(1) }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'The name of the collection to create',
+          },
+        },
+        required: ['name'],
+        additionalProperties: false,
+      },
+      execute: async ({ name }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.CreateDoc');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const rootDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            workspaceId
+          );
+          if (!rootDoc?.bin) {
+            return toolError('Workspace root doc not found');
+          }
+          const rootBin = Buffer.isBuffer(rootDoc.bin)
+            ? rootDoc.bin
+            : Buffer.from(
+                rootDoc.bin.buffer,
+                rootDoc.bin.byteOffset,
+                rootDoc.bin.byteLength
+              );
+
+          const collections = parseCollections(rootBin);
+          const duplicate = collections.find(
+            c => c.name.toLowerCase() === name.toLowerCase()
+          );
+          if (duplicate) {
+            return toolText(
+              JSON.stringify({
+                success: true,
+                collection: duplicate,
+                message: 'Collection already exists',
+              })
+            );
+          }
+
+          const collectionId = nanoid();
+          const update = buildCollectionUpdate(
+            rootBin,
+            { id: collectionId, name },
+            'create'
+          );
+          await this.workspaceStorage.pushDocUpdates(
+            workspaceId,
+            workspaceId,
+            [update],
+            userId
+          );
+
+          return toolText(
+            JSON.stringify(
+              {
+                success: true,
+                collection: { id: collectionId, name, allowList: [] },
+                message: `Collection '${name}' created successfully`,
+              },
+              null,
+              2
+            )
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to create collection: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const addDocToCollection = defineTool({
+      name: 'add_doc_to_collection',
+      title: 'Add Document to Collection',
+      description:
+        "Add a document to a collection (adds to collection's allowList).",
+      parser: z.object({ collectionId: z.string(), docId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          collectionId: {
+            type: 'string',
+            description: 'The ID of the collection',
+          },
+          docId: {
+            type: 'string',
+            description: 'The ID of the document to add',
+          },
+        },
+        required: ['collectionId', 'docId'],
+        additionalProperties: false,
+      },
+      execute: async ({ collectionId, docId }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .doc(docId)
+            .assert('Doc.Read');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const rootDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            workspaceId
+          );
+          if (!rootDoc?.bin) return toolError('Workspace root doc not found');
+          const rootBin = Buffer.isBuffer(rootDoc.bin)
+            ? rootDoc.bin
+            : Buffer.from(
+                rootDoc.bin.buffer,
+                rootDoc.bin.byteOffset,
+                rootDoc.bin.byteLength
+              );
+
+          const collections = parseCollections(rootBin);
+          const target = collections.find(c => c.id === collectionId);
+          if (!target)
+            return toolError(`Collection ID ${collectionId} not found`);
+
+          if (target.allowList.includes(docId)) {
+            return toolText(
+              JSON.stringify({
+                success: true,
+                message: 'Doc already in collection',
+              })
+            );
+          }
+
+          const newAllowList = [...target.allowList, docId];
+          const update = buildCollectionUpdate(
+            rootBin,
+            { id: collectionId, allowList: newAllowList },
+            'update_allow_list'
+          );
+          await this.workspaceStorage.pushDocUpdates(
+            workspaceId,
+            workspaceId,
+            [update],
+            userId
+          );
+
+          return toolText(
+            JSON.stringify({
+              success: true,
+              message: 'Added document to collection successfully',
+            })
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to add doc to collection: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const removeDocFromCollection = defineTool({
+      name: 'remove_doc_from_collection',
+      title: 'Remove Document from Collection',
+      description: 'Remove a document from a collection.',
+      parser: z.object({ collectionId: z.string(), docId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          collectionId: {
+            type: 'string',
+            description: 'The ID of the collection',
+          },
+          docId: {
+            type: 'string',
+            description: 'The ID of the document to remove',
+          },
+        },
+        required: ['collectionId', 'docId'],
+        additionalProperties: false,
+      },
+      execute: async ({ collectionId, docId }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.Read');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const rootDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            workspaceId
+          );
+          if (!rootDoc?.bin) return toolError('Workspace root doc not found');
+          const rootBin = Buffer.isBuffer(rootDoc.bin)
+            ? rootDoc.bin
+            : Buffer.from(
+                rootDoc.bin.buffer,
+                rootDoc.bin.byteOffset,
+                rootDoc.bin.byteLength
+              );
+
+          const collections = parseCollections(rootBin);
+          const target = collections.find(c => c.id === collectionId);
+          if (!target)
+            return toolError(`Collection ID ${collectionId} not found`);
+
+          if (!target.allowList.includes(docId)) {
+            return toolText(
+              JSON.stringify({
+                success: true,
+                message: 'Doc not in collection',
+              })
+            );
+          }
+
+          const newAllowList = target.allowList.filter(id => id !== docId);
+          const update = buildCollectionUpdate(
+            rootBin,
+            { id: collectionId, allowList: newAllowList },
+            'update_allow_list'
+          );
+          await this.workspaceStorage.pushDocUpdates(
+            workspaceId,
+            workspaceId,
+            [update],
+            userId
+          );
+
+          return toolText(
+            JSON.stringify({
+              success: true,
+              message: 'Removed document from collection successfully',
+            })
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to remove doc from collection: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const listFolders = defineTool({
+      name: 'list_folders',
+      title: 'List Folders',
+      description:
+        'List all folders and hierarchical organization tree in the workspace.',
+      parser: z.object({}),
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+      execute: async (_, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.Read');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const folderDocId = `db$folders`;
+          const folderDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            folderDocId
+          );
+          if (!folderDoc?.bin) {
+            return toolText(JSON.stringify({ folders: [] }));
+          }
+          const bin = Buffer.isBuffer(folderDoc.bin)
+            ? folderDoc.bin
+            : Buffer.from(
+                folderDoc.bin.buffer,
+                folderDoc.bin.byteOffset,
+                folderDoc.bin.byteLength
+              );
+          const nodes = parseFolders(bin);
+          const tree = buildFolderTree(nodes);
+          return toolText(JSON.stringify({ folders: tree }, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to list folders: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const createFolder = defineTool({
+      name: 'create_folder',
+      title: 'Create Folder',
+      description:
+        'Create a new folder in the workspace hierarchy. Use this when the user asks to create or add a new folder.',
+      parser: z.object({
+        name: z.string().min(1),
+        parentId: z.string().optional(),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'The name of the folder to create',
+          },
+          parentId: {
+            type: 'string',
+            description: 'Optional parent folder ID',
+          },
+        },
+        required: ['name'],
+        additionalProperties: false,
+      },
+      execute: async ({ name, parentId }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.CreateDoc');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const folderDocId = `db$folders`;
+          const folderDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            folderDocId
+          );
+          const existingBin = folderDoc?.bin
+            ? Buffer.isBuffer(folderDoc.bin)
+              ? folderDoc.bin
+              : Buffer.from(
+                  folderDoc.bin.buffer,
+                  folderDoc.bin.byteOffset,
+                  folderDoc.bin.byteLength
+                )
+            : Buffer.alloc(0);
+
+          const nodes = parseFolders(existingBin);
+          if (parentId) {
+            const parent = nodes.find(n => n.id === parentId);
+            if (!parent || parent.type !== 'folder') {
+              return toolError(`Parent folder ${parentId} not found`);
+            }
+          }
+
+          const folderId = nanoid();
+          const index = `a${nanoid(5)}`;
+          const update = buildFolderUpdate(existingBin, {
+            id: folderId,
+            parentId: parentId || null,
+            data: name,
+            type: 'folder',
+            index,
+          });
+
+          await this.workspaceStorage.pushDocUpdates(
+            workspaceId,
+            folderDocId,
+            [update],
+            userId
+          );
+
+          return toolText(
+            JSON.stringify(
+              {
+                success: true,
+                folder: {
+                  id: folderId,
+                  name,
+                  parentId: parentId || null,
+                  index,
+                },
+                message: `Folder '${name}' created successfully`,
+              },
+              null,
+              2
+            )
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to create folder: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const addDocToFolder = defineTool({
+      name: 'add_doc_to_folder',
+      title: 'Add Document to Folder',
+      description: 'Move/add a document inside a folder.',
+      parser: z.object({ folderId: z.string(), docId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          folderId: { type: 'string', description: 'The ID of the folder' },
+          docId: {
+            type: 'string',
+            description: 'The ID of the document to add',
+          },
+        },
+        required: ['folderId', 'docId'],
+        additionalProperties: false,
+      },
+      execute: async ({ folderId, docId }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .doc(docId)
+            .assert('Doc.Read');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const folderDocId = `db$folders`;
+          const folderDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            folderDocId
+          );
+          if (!folderDoc?.bin) return toolError('Folder database not found');
+          const existingBin = Buffer.isBuffer(folderDoc.bin)
+            ? folderDoc.bin
+            : Buffer.from(
+                folderDoc.bin.buffer,
+                folderDoc.bin.byteOffset,
+                folderDoc.bin.byteLength
+              );
+
+          const nodes = parseFolders(existingBin);
+          const folder = nodes.find(n => n.id === folderId);
+          if (!folder || folder.type !== 'folder') {
+            return toolError(`Target folder ID ${folderId} not found`);
+          }
+
+          const linkId = nanoid();
+          const index = `a${nanoid(5)}`;
+          const update = buildFolderUpdate(existingBin, {
+            id: linkId,
+            parentId: folderId,
+            data: docId,
+            type: 'doc',
+            index,
+          });
+
+          await this.workspaceStorage.pushDocUpdates(
+            workspaceId,
+            folderDocId,
+            [update],
+            userId
+          );
+
+          return toolText(
+            JSON.stringify({
+              success: true,
+              message: 'Successfully added document to folder',
+            })
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to add doc to folder: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const removeDocFromFolder = defineTool({
+      name: 'remove_doc_from_folder',
+      title: 'Remove Document from Folder',
+      description: 'Remove a document from a folder.',
+      parser: z.object({ folderId: z.string(), docId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          folderId: { type: 'string', description: 'The ID of the folder' },
+          docId: {
+            type: 'string',
+            description: 'The ID of the document to remove',
+          },
+        },
+        required: ['folderId', 'docId'],
+        additionalProperties: false,
+      },
+      execute: async ({ folderId, docId }, options) => {
+        try {
+          await this.ac
+            .user(userId)
+            .workspace(workspaceId)
+            .assert('Workspace.Read');
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const folderDocId = `db$folders`;
+          const folderDoc = await this.workspaceStorage.getDoc(
+            workspaceId,
+            folderDocId
+          );
+          if (!folderDoc?.bin)
+            return toolText(
+              JSON.stringify({
+                success: true,
+                message: 'Folder database not found',
+              })
+            );
+          const existingBin = Buffer.isBuffer(folderDoc.bin)
+            ? folderDoc.bin
+            : Buffer.from(
+                folderDoc.bin.buffer,
+                folderDoc.bin.byteOffset,
+                folderDoc.bin.byteLength
+              );
+
+          const nodes = parseFolders(existingBin);
+          const link = nodes.find(
+            n => n.parentId === folderId && n.type === 'doc' && n.data === docId
+          );
+          if (!link) {
+            return toolText(
+              JSON.stringify({
+                success: true,
+                message: 'Document not found in folder',
+              })
+            );
+          }
+
+          const update = buildFolderUpdate(existingBin, { id: link.id }, true);
+          await this.workspaceStorage.pushDocUpdates(
+            workspaceId,
+            folderDocId,
+            [update],
+            userId
+          );
+
+          return toolText(
+            JSON.stringify({
+              success: true,
+              message: 'Successfully removed document from folder',
+            })
+          );
+        } catch (error) {
+          return toolError(
+            `Failed to remove doc from folder: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const webSearch = defineTool({
+      name: 'web_search',
+      title: 'Web Search',
+      description:
+        'Search the web for current information using a free search engine. Returns web page titles, URLs, and snippets.',
+      parser: z.object({
+        query: z.string(),
+        limit: z.number().optional().default(10),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The search query' },
+          limit: {
+            type: 'number',
+            description: 'Number of results to return. Default: 10',
+          },
+        },
+        required: ['query'],
+        additionalProperties: false,
+      },
+      execute: async ({ query, limit }, options) => {
+        try {
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+          const results = await searchDuckDuckGo(query, limit);
+          return toolText(JSON.stringify(results, null, 2));
+        } catch (error) {
+          return toolError(
+            `Web search failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const urlContentRead = defineTool({
+      name: 'url_content_read',
+      title: 'URL Content Read',
+      description:
+        'Fetch and read the content of any web page URL. Extracts clean text content, removing ads and scripts.',
+      parser: z.object({
+        url: z.string(),
+        maxLength: z.number().optional().default(50000),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'The URL to read (including http:// or https://)',
+          },
+          maxLength: {
+            type: 'number',
+            description:
+              'Maximum characters to extract from the page. Default: 50000',
+          },
+        },
+        required: ['url'],
+        additionalProperties: false,
+      },
+      execute: async ({ url, maxLength }, options) => {
+        try {
+          const aborted = abortIfNeeded(options.signal);
+          if (aborted) return aborted;
+
+          const res = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; AFFiNE-Research-Bot/1.0)',
+              Accept:
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+            redirect: 'follow',
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+          const contentType = res.headers.get('content-type') || '';
+          const html = await res.text();
+
+          if (
+            contentType.includes('application/json') ||
+            contentType.includes('text/plain')
+          ) {
+            return toolText(
+              JSON.stringify(
+                {
+                  title: url,
+                  url,
+                  content: html.slice(0, maxLength),
+                  contentType: contentType.includes('application/json')
+                    ? 'json'
+                    : 'text',
+                },
+                null,
+                2
+              )
+            );
+          }
+
+          const title = extractHtmlTag(html, 'title') || url;
+          const content = htmlToCleanText(html, maxLength);
+          const description = extractMeta(html, 'description');
+          const author = extractMeta(html, 'author');
+
+          return toolText(
+            JSON.stringify(
+              {
+                title,
+                url,
+                description,
+                author: author || null,
+                content,
+                contentType: 'html',
+              },
+              null,
+              2
+            )
+          );
+        } catch (error) {
+          return toolError(
+            `URL content read failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
     tools.push(
       createDocument,
       updateDocument,
       updateDocumentMeta,
       queryUiFeatures,
       listKanbanTasks,
-      updateKanbanTaskStatus
+      updateKanbanTaskStatus,
+      listCollections,
+      createCollection,
+      addDocToCollection,
+      removeDocFromCollection,
+      listFolders,
+      createFolder,
+      addDocToFolder,
+      removeDocFromFolder,
+      webSearch,
+      urlContentRead
     );
 
     return {

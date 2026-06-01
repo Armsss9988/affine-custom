@@ -73,7 +73,7 @@ export class TestingPromptService extends PromptService {
     this.builtInPromptOverrides.set(name, next);
   }
 
-  protected override lookupCompatPrompt(name: string) {
+  protected override async lookupCompatPrompt(name: string) {
     return (
       this.builtInPromptOverrides.get(name) ??
       this.customPrompts.get(name) ??

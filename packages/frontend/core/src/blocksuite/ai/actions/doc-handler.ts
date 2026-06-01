@@ -220,10 +220,10 @@ export function actionToHandler<T extends keyof BlockSuitePresets.AIActions>(
     if (!block) return;
     if (
       blocks.length === 1 &&
-      block.model.flavour === 'affine:image' &&
-      id === 'createImage'
+      ((block.model.flavour === 'affine:image' && id === 'createImage') ||
+        (id as string) === 'generateCode' ||
+        (id as string) === 'editCode')
     ) {
-      // if only one image block is selected, and the action is createImage
       // toggle panel to allow user to enter text prompt
       aiPanel.toggle(block, 'input');
     } else {

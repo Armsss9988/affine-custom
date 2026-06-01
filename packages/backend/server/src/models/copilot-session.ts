@@ -567,6 +567,21 @@ export class CopilotSessionModel extends BaseModel {
         id: getEqCond(sessionId),
         deletedAt: null,
         pinned: getEqCond(options.pinned),
+        // Filter out empty sessions with zero messageCost to avoid cluttering history with "New Chat" entries
+        ...(sessionId
+          ? {}
+          : {
+              OR: [
+                { messageCost: { gt: 0 } },
+                {
+                  messageCost: 0,
+                  title: {
+                    notIn: ['', 'New chat', 'Chat With AFFiNE AI'],
+                    not: null,
+                  },
+                },
+              ],
+            }),
         ...(action === false ? this.noActionPromptCondition() : {}),
         ...(action === true ? { NOT: this.noActionPromptCondition() } : {}),
         ...(fork === true
@@ -589,6 +604,20 @@ export class CopilotSessionModel extends BaseModel {
         // should only find forked session
         parentSessionId: { not: null },
         deletedAt: null,
+        ...(sessionId
+          ? {}
+          : {
+              OR: [
+                { messageCost: { gt: 0 } },
+                {
+                  messageCost: 0,
+                  title: {
+                    notIn: ['', 'New chat', 'Chat With AFFiNE AI'],
+                    not: null,
+                  },
+                },
+              ],
+            }),
       });
     }
 

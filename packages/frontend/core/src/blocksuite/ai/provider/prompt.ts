@@ -24,6 +24,8 @@ export const promptKeys = [
   'Fix spelling for it',
   'Find action items from it',
   'Check code error',
+  'Generate code by request',
+  'Edit/modify code',
   'Create headings',
   'Make it real',
   'Make it real with text',

@@ -486,6 +486,35 @@ export function buildAIImageItemGroups(): AIItemGroupConfig[] {
 export function buildAICodeItemGroups(): AIItemGroupConfig[] {
   return [
     {
+      name: 'Write & Edit Code',
+      items: [
+        {
+          name: 'Generate code by request',
+          testId: 'action-generate-code',
+          icon: PenIcon(),
+          showWhen: () => true,
+          handler: actionToHandler(
+            'generateCode' as any,
+            AIStarIconWithAnimation,
+            undefined,
+            blockActionTrackerOptions
+          ),
+        },
+        {
+          name: 'Edit/modify code',
+          testId: 'action-edit-code',
+          icon: PenIcon(),
+          showWhen: () => true,
+          handler: actionToHandler(
+            'editCode' as any,
+            AIStarIconWithAnimation,
+            undefined,
+            blockActionTrackerOptions
+          ),
+        },
+      ],
+    },
+    {
       name: 'review code',
       items: [
         {

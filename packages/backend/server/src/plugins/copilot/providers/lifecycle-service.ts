@@ -52,7 +52,12 @@ export class CopilotProviderLifecycleService {
       }
 
       const execution: CopilotProviderExecution = { providerId, profile };
-      if (!provider.configured(execution)) {
+      const isConfigured = provider.configured(execution);
+      console.log(
+        `[CopilotSync] Provider: ${provider.type}, ID: ${providerId}, isConfigured: ${isConfigured}, config:`,
+        provider.getConfig(execution)
+      );
+      if (!isConfigured) {
         this.factory.unregister(providerId, provider);
         continue;
       }

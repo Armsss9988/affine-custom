@@ -49,24 +49,33 @@ export const VertexSchema: JSONSchema = {
       description: 'The project name of the google vertex provider.',
     },
     googleAuthOptions: {
-      type: 'object',
       description: 'The google auth options for the google vertex provider.',
-      properties: {
-        credentials: {
+      anyOf: [
+        {
+          type: 'string',
+        },
+        {
           type: 'object',
-          description: 'The credentials for the google vertex provider.',
           properties: {
-            client_email: {
-              type: 'string',
-              description: 'The client email for the google vertex provider.',
-            },
-            private_key: {
-              type: 'string',
-              description: 'The private key for the google vertex provider.',
+            credentials: {
+              type: 'object',
+              description: 'The credentials for the google vertex provider.',
+              properties: {
+                client_email: {
+                  type: 'string',
+                  description:
+                    'The client email for the google vertex provider.',
+                },
+                private_key: {
+                  type: 'string',
+                  description:
+                    'The private key for the google vertex provider.',
+                },
+              },
             },
           },
         },
-      },
+      ],
     },
   },
 };
@@ -121,6 +130,27 @@ export const PromptToolsSchema = z
     'citationFormat',
     'translateText',
     'docSynthesis',
+    // organization (Phase 2)
+    'tagList',
+    'tagCreate',
+    'tagAddToDoc',
+    'tagRemoveFromDoc',
+    'favoriteList',
+    'favoriteAdd',
+    'favoriteRemove',
+    'collectionList',
+    'collectionCreate',
+    'collectionAddDoc',
+    'collectionRemoveDoc',
+    'folderList',
+    'folderCreate',
+    'folderAddDoc',
+    'folderRemoveDoc',
+    // database (Phase 3)
+    'databaseCreate',
+    'databaseQuery',
+    'databaseAddRow',
+    'databaseAddView',
   ])
   .array();
 

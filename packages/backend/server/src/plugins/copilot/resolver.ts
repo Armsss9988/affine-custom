@@ -67,10 +67,7 @@ class CreateChatSessionInput {
 }
 
 @InputType()
-class UpdateChatSessionInput implements Omit<
-  UpdateChatSession,
-  'userId'
-> {
+class UpdateChatSessionInput implements Omit<UpdateChatSession, 'userId'> {
   @Field(() => String)
   sessionId!: string;
 
@@ -450,11 +447,24 @@ export class CopilotResolver {
 
       return models.filter(model => !!model) as CopilotModelType[];
     };
+    const optionalModelsIds =
+      promptName === 'Chat With AFFiNE AI' && process.env.NODE_ENV !== 'test'
+        ? [
+            'geminiVertex-default/gemini-3.5-flash',
+            'openai-default/stepfun-3.5',
+          ]
+        : prompt.optionalModels;
+
+    const defaultModel =
+      promptName === 'Chat With AFFiNE AI' && process.env.NODE_ENV !== 'test'
+        ? 'geminiVertex-default/gemini-3.5-flash'
+        : prompt.model;
+
     const proModels = prompt.config?.proModels || [];
 
     return {
-      defaultModel: prompt.model,
-      optionalModels: await convertModels(prompt.optionalModels),
+      defaultModel,
+      optionalModels: await convertModels(optionalModelsIds),
       proModels: await convertModels(proModels),
     };
   }
@@ -625,12 +635,7 @@ export class CopilotResolver {
       }))
       .filter(h => (options?.withMessages ? h.messages.length > 0 : true));
 
-    return paginate(
-      filteredHistories,
-      'updatedAt',
-      pagination,
-      totalCount
-    );
+    return paginate(filteredHistories, 'updatedAt', pagination, totalCount);
   }
 
   private async createCopilotSessionInternal(

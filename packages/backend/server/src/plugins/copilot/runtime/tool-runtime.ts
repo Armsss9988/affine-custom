@@ -73,6 +73,46 @@ import {
   createWikipediaSearchTool,
   createWorkspaceInfoTool,
   getConfiguredExaKey,
+  // Phase 2
+  buildTagListHandler,
+  buildTagCreateHandler,
+  buildTagAddToDocHandler,
+  buildTagRemoveFromDocHandler,
+  buildFavoriteListHandler,
+  buildFavoriteAddHandler,
+  buildFavoriteRemoveHandler,
+  buildCollectionListHandler,
+  buildCollectionCreateHandler,
+  buildCollectionAddDocHandler,
+  buildCollectionRemoveDocHandler,
+  buildFolderListHandler,
+  buildFolderCreateHandler,
+  buildFolderAddDocHandler,
+  buildFolderRemoveDocHandler,
+  createTagListTool,
+  createTagCreateTool,
+  createTagAddToDocTool,
+  createTagRemoveFromDocTool,
+  createFavoriteListTool,
+  createFavoriteAddTool,
+  createFavoriteRemoveTool,
+  createCollectionListTool,
+  createCollectionCreateTool,
+  createCollectionAddDocTool,
+  createCollectionRemoveDocTool,
+  createFolderListTool,
+  createFolderCreateTool,
+  createFolderAddDocTool,
+  createFolderRemoveDocTool,
+  // Phase 3
+  buildDatabaseCreateHandler,
+  buildDatabaseQueryHandler,
+  buildDatabaseAddRowHandler,
+  buildDatabaseAddViewHandler,
+  createDatabaseCreateTool,
+  createDatabaseQueryTool,
+  createDatabaseAddRowTool,
+  createDatabaseAddViewTool,
 } from '../tools';
 import { PromptRuntime } from './prompt-runtime';
 import type { ToolLoopBackend } from './tool/bridge';
@@ -423,6 +463,213 @@ export class ToolRuntime {
           tools.doc_synthesis = createDocSynthesisTool(
             getDoc.bind(null, options),
             runPromptText
+          );
+          break;
+        }
+        // ===== Phase 2: Organization =====
+        case 'tagList': {
+          const listTags = buildTagListHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.tag_list = createTagListTool(listTags.bind(null, options));
+          break;
+        }
+        case 'tagCreate': {
+          const createTag = buildTagCreateHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.tag_create = createTagCreateTool(createTag.bind(null, options));
+          break;
+        }
+        case 'tagAddToDoc': {
+          const addTag = buildTagAddToDocHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.tag_add_to_doc = createTagAddToDocTool(
+            addTag.bind(null, options)
+          );
+          break;
+        }
+        case 'tagRemoveFromDoc': {
+          const removeTag = buildTagRemoveFromDocHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.tag_remove_from_doc = createTagRemoveFromDocTool(
+            removeTag.bind(null, options)
+          );
+          break;
+        }
+        case 'favoriteList': {
+          const listFavorites = buildFavoriteListHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.favorite_list = createFavoriteListTool(
+            listFavorites.bind(null, options)
+          );
+          break;
+        }
+        case 'favoriteAdd': {
+          const addFavorite = buildFavoriteAddHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.favorite_add = createFavoriteAddTool(
+            addFavorite.bind(null, options)
+          );
+          break;
+        }
+        case 'favoriteRemove': {
+          const removeFavorite = buildFavoriteRemoveHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.favorite_remove = createFavoriteRemoveTool(
+            removeFavorite.bind(null, options)
+          );
+          break;
+        }
+        case 'collectionList': {
+          const listCollections = buildCollectionListHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.collection_list = createCollectionListTool(
+            listCollections.bind(null, options)
+          );
+          break;
+        }
+        case 'collectionCreate': {
+          const createCollection = buildCollectionCreateHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.collection_create = createCollectionCreateTool(
+            createCollection.bind(null, options)
+          );
+          break;
+        }
+        case 'collectionAddDoc': {
+          const addDoc = buildCollectionAddDocHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.collection_add_doc = createCollectionAddDocTool(
+            addDoc.bind(null, options)
+          );
+          break;
+        }
+        case 'collectionRemoveDoc': {
+          const removeDoc = buildCollectionRemoveDocHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.collection_remove_doc = createCollectionRemoveDocTool(
+            removeDoc.bind(null, options)
+          );
+          break;
+        }
+        case 'folderList': {
+          const listFolders = buildFolderListHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.folder_list = createFolderListTool(
+            listFolders.bind(null, options)
+          );
+          break;
+        }
+        case 'folderCreate': {
+          const createFolder = buildFolderCreateHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.folder_create = createFolderCreateTool(
+            createFolder.bind(null, options)
+          );
+          break;
+        }
+        case 'folderAddDoc': {
+          const addDoc = buildFolderAddDocHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.folder_add_doc = createFolderAddDocTool(
+            addDoc.bind(null, options)
+          );
+          break;
+        }
+        case 'folderRemoveDoc': {
+          const removeDoc = buildFolderRemoveDocHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.folder_remove_doc = createFolderRemoveDocTool(
+            removeDoc.bind(null, options)
+          );
+          break;
+        }
+        // ===== Phase 3: Database =====
+        case 'databaseCreate': {
+          const createDb = buildDatabaseCreateHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.database_create = createDatabaseCreateTool(
+            createDb.bind(null, options)
+          );
+          break;
+        }
+        case 'databaseQuery': {
+          const queryDb = buildDatabaseQueryHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.database_query = createDatabaseQueryTool(
+            queryDb.bind(null, options)
+          );
+          break;
+        }
+        case 'databaseAddRow': {
+          const addRow = buildDatabaseAddRowHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.database_add_row = createDatabaseAddRowTool(
+            addRow.bind(null, options)
+          );
+          break;
+        }
+        case 'databaseAddView': {
+          const addView = buildDatabaseAddViewHandler(
+            this.ac,
+            this.storage,
+            this.models
+          );
+          tools.database_add_view = createDatabaseAddViewTool(
+            addView.bind(null, options)
           );
           break;
         }

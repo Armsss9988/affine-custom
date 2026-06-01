@@ -8,30 +8,27 @@
     "providers": {
       "openai": {
         "apiKey": "nim-proxy-key",
-        "baseURL": "http://chatbot:3099/v1"
+        "baseURL": "http://affine_chatbot:3099/v1",
+        "oldApiStyle": true
       },
       "gemini": {
-        "apiKey": "nim-proxy-key",
-        "baseURL": "http://chatbot:3099/v1beta"
-      }
+        "apiKey": "AIzaSyAF1KrcUQ9Q4FD9TY65Jg5eDLnbkPO74PE",
+        "baseURL": "http://affine_chatbot:3099/v1beta"
+      },
+      "geminiVertex": {}
     },
     "scenarios": {
       "override_enabled": true,
       "scenarios": {
         "audio_transcribing": "gpt-4o",
-        "chat": "gpt-4o",
-        "embedding": "gpt-4o",
-        "image": "gpt-4o",
-        "rerank": "gpt-4o",
-        "coding": "gpt-4o",
-        "complex_text_generation": "gpt-4o",
-        "quick_decision_making": "gpt-4o",
-        "quick_text_generation": "gpt-4o",
-        "polish_and_summarize": "gpt-4o"
+        "chat": "gemini-1.5-flash",
+        "chat_with_doc": "gemini-1.5-flash",
+        "copilot_doc": "gemini-1.5-flash",
+        "embedding": "text-embedding-3-large",
+        "ocr": "gpt-4o",
+        "summary": "gemini-1.5-flash",
+        "translation": "gemini-1.5-flash"
       }
-    },
-    "exa": {
-      "key": "your_exa_api_key"
     }
   }
 }

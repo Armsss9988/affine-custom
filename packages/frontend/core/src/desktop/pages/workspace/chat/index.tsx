@@ -40,7 +40,10 @@ import {
   ViewTitle,
   WorkbenchService,
 } from '@affine/core/modules/workbench';
-import { WorkspaceService, WorkspaceLocalState } from '@affine/core/modules/workspace';
+import {
+  WorkspaceService,
+  WorkspaceLocalState,
+} from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
 import { RefNodeSlotsProvider } from '@blocksuite/affine/inlines/reference';
 import { BlockStdScope } from '@blocksuite/affine/std';
@@ -50,12 +53,12 @@ import { useFramework, useService } from '@toeverything/infra';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  createSessionDeleteHandler,
-} from '../chat-panel-utils';
+import { createSessionDeleteHandler } from '../chat-panel-utils';
 import * as styles from './index.css';
 
-type CopilotSession = NonNullable<Awaited<ReturnType<CopilotClient['getSession']>>>;
+type CopilotSession = NonNullable<
+  Awaited<ReturnType<CopilotClient['getSession']>>
+>;
 
 const createPlaceholderNewSession = (): CopilotSession => ({
   sessionId: 'new',
@@ -150,7 +153,8 @@ export const Component = () => {
     return map;
   }, [workspaceId]);
 
-  const chatContentMapRef = useRef<Map<string, AIChatContent>>(getWorkspaceMap());
+  const chatContentMapRef =
+    useRef<Map<string, AIChatContent>>(getWorkspaceMap());
 
   useEffect(() => {
     chatContentMapRef.current = getWorkspaceMap();
@@ -182,7 +186,16 @@ export const Component = () => {
       .then(results => {
         if (cancelled) return;
         const valid = (results as (CopilotSession | null | undefined)[]).filter(
-          (entry): entry is CopilotSession => !!entry && !!entry.sessionId
+          (entry): entry is CopilotSession => {
+            if (!entry || !entry.sessionId) return false;
+            const hasMessages = !!(entry.messages && entry.messages.length > 0);
+            const hasCustomTitle = !!(
+              entry.title &&
+              entry.title !== 'New chat' &&
+              entry.title !== 'Chat With AFFiNE AI'
+            );
+            return hasMessages || hasCustomTitle;
+          }
         );
         if (valid.length) {
           setOpenTabsState(valid);
@@ -303,11 +316,16 @@ export const Component = () => {
         setCurrentSession(existing);
         chatTool?.closeHistoryMenu();
         // Fetch the latest from the server in the background to update it
-        client.getSession(workspaceId, sessionId)
+        client
+          .getSession(workspaceId, sessionId)
           .then(latestSession => {
             if (latestSession) {
-              setOpenTabs(prev => prev.map(t => t.sessionId === sessionId ? latestSession : t));
-              setCurrentSession(prev => prev?.sessionId === sessionId ? latestSession : prev);
+              setOpenTabs(prev =>
+                prev.map(t => (t.sessionId === sessionId ? latestSession : t))
+              );
+              setCurrentSession(prev =>
+                prev?.sessionId === sessionId ? latestSession : prev
+              );
             }
           })
           .catch(console.error);
@@ -400,7 +418,9 @@ export const Component = () => {
 
       // 2. Handle instant tab title generation on the first user message
       if (context.messages && context.messages.length > 0) {
-        const firstUserMsg = (context.messages as any[]).find(m => m.role === 'user');
+        const firstUserMsg = (context.messages as any[]).find(
+          m => m.role === 'user'
+        );
         if (firstUserMsg && (firstUserMsg as any).content) {
           const currentSessionForTab = openTabsRef.current.find(
             t => t.sessionId === sessionKey
@@ -548,7 +568,7 @@ export const Component = () => {
     content.docDisplayConfig = docDisplayConfig;
     content.searchMenuConfig = searchMenuConfig;
     content.reasoningConfig = reasoningConfig;
-    content.onContextChange = (context) => {
+    content.onContextChange = context => {
       onSessionContextChange(sessionKey, context);
     };
     content.affineFeatureFlagService = framework.get(FeatureFlagService);
@@ -779,7 +799,14 @@ export const Component = () => {
   useEffect(() => {
     if (currentSession?.sessionId) {
       try {
-        sessionStorage.setItem('affine_last_chat_session', currentSession.sessionId);
+        if (currentSession.sessionId === 'new') {
+          sessionStorage.removeItem('affine_last_chat_session');
+        } else {
+          sessionStorage.setItem(
+            'affine_last_chat_session',
+            currentSession.sessionId
+          );
+        }
       } catch {}
     }
   }, [currentSession?.sessionId]);

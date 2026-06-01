@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { AccessController } from '../../../core/permission';
 import { Models } from '../../../models';
+import { PublicDocMode } from '../../../models/common/doc';
 import { toolError } from './error';
 import { defineTool } from './tool';
 import type { CopilotChatOptions } from './types';
@@ -27,22 +28,20 @@ export const buildDocShareEnableHandler = (
         'Missing user or workspace context'
       );
     }
-    const canManage = await ac
+    const canPublish = await ac
       .user(options.user)
       .workspace(options.workspace)
       .doc(docId)
-      .can('Doc.Manage');
-    if (!canManage) {
+      .can('Doc.Publish');
+    if (!canPublish) {
       return toolError(
         'Share Enable Failed',
         `No permission to share doc ${docId}`
       );
     }
-    await models.doc.publish(
-      options.workspace,
-      docId,
-      mode === 'edgeless' ? 'edgeless' : 'page'
-    );
+    const docMode =
+      mode === 'edgeless' ? PublicDocMode.Edgeless : PublicDocMode.Page;
+    await models.doc.publish(options.workspace, docId, docMode);
     const url = `${process.env['AFFINE_SERVER_EXTERNAL_URL'] ?? ''}/share/${options.workspace}/${docId}`;
     logger.log(`Doc ${docId} published as public by ${options.user}`);
     return {
@@ -65,12 +64,12 @@ export const buildDocShareDisableHandler = (
         'Missing user or workspace context'
       );
     }
-    const canManage = await ac
+    const canPublish = await ac
       .user(options.user)
       .workspace(options.workspace)
       .doc(docId)
-      .can('Doc.Manage');
-    if (!canManage) {
+      .can('Doc.Publish');
+    if (!canPublish) {
       return toolError(
         'Share Disable Failed',
         `No permission to manage sharing for doc ${docId}`

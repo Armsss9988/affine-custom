@@ -275,6 +275,46 @@ defineModuleConfig('copilot', {
     desc: 'The config for the gemini provider in Google Vertex AI.',
     default: {},
     schema: VertexSchema,
+    validate: (value: any) => {
+      const project = process.env.VERTEX_PROJECT || value?.project;
+      const location = process.env.VERTEX_LOCATION || value?.location;
+      const clientEmail =
+        process.env.VERTEX_CLIENT_EMAIL ||
+        value?.googleAuthOptions?.credentials?.client_email;
+      const privateKey =
+        process.env.VERTEX_PRIVATE_KEY ||
+        value?.googleAuthOptions?.credentials?.private_key;
+      const authToken = process.env.VERTEX_AUTH_TOKEN;
+
+      console.log('[VertexValidate] inputs from env:', {
+        project,
+        location,
+        clientEmail,
+        privateKey: !!privateKey,
+        authToken: !!authToken,
+      });
+
+      const config = { ...value };
+      if (location) {
+        config.location = location;
+      }
+      if (project) {
+        config.project = project;
+      }
+      if (authToken) {
+        config.googleAuthOptions = authToken;
+      } else if (project && location && clientEmail && privateKey) {
+        config.googleAuthOptions = {
+          ...config.googleAuthOptions,
+          credentials: {
+            client_email: clientEmail,
+            private_key: privateKey.replace(/\\n/g, '\n'),
+          },
+        };
+      }
+      console.log('[VertexValidate] config output:', config);
+      return z.any().safeParse(config);
+    },
   },
   'providers.anthropic': {
     desc: 'The config for the anthropic provider.',

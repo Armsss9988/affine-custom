@@ -119,10 +119,40 @@ export function resolveProviderModelSelection(
   cond: ModelFullConditions
 ): ProviderModelSelection | undefined {
   if (cond.modelId) {
-    const resolved = llmResolveModelRegistryVariant({
+    let modelId = cond.modelId;
+    if (modelId.includes('/')) {
+      modelId = modelId.split('/').pop()!;
+    }
+
+    let resolved = llmResolveModelRegistryVariant({
       backendKind: context.backendKind,
-      modelId: cond.modelId,
+      modelId: modelId,
     }).variant;
+
+    if (!resolved) {
+      if (modelId === 'gemini-3.5-flash') {
+        resolved = llmResolveModelRegistryVariant({
+          backendKind: context.backendKind,
+          modelId: 'gemini-2.5-flash',
+        }).variant;
+        if (resolved) {
+          resolved.rawModelId = 'gemini-3.5-flash';
+          resolved.displayName = 'Gemini 3.5 Flash';
+          resolved.canonicalKey = 'gemini-3.5-flash';
+        }
+      } else if (modelId === 'stepfun-3.5') {
+        resolved = llmResolveModelRegistryVariant({
+          backendKind: context.backendKind,
+          modelId: 'gpt-4o',
+        }).variant;
+        if (resolved) {
+          resolved.rawModelId = 'stepfun-3.5';
+          resolved.displayName = 'StepFun 3.5';
+          resolved.canonicalKey = 'stepfun-3.5';
+        }
+      }
+    }
+
     if (!resolved) {
       return;
     }

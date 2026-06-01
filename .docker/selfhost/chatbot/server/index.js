@@ -30,9 +30,9 @@ app.use('/v1', copilotRouter);
 // copilot router since all requests get remapped to NIM anyway.
 app.use('/v1beta', copilotRouter);
 
-// REST API endpoints for ChatGPT Integration (Documents CRUD and Search)
-// const docsRouter = require('./docs');
-// app.use('/api/docs', docsRouter);
+// REST API endpoints for ChatGPT Integration (Documents, Folders, Collections, etc. under /api)
+const docsRouter = require('./docs');
+app.use('/api', docsRouter);
 
 // Chat endpoint (streaming via SSE)
 app.post('/api/chat', async (req, res) => {

@@ -106,12 +106,25 @@ export function setupAIProvider(
         html: contexts?.html,
         ...(options.docId ? { currentDocId: options.docId } : {}),
         clientContext: {
-          currentRoute: typeof window !== 'undefined' ? window.location.pathname : '',
+          currentRoute:
+            typeof window !== 'undefined' ? window.location.pathname : '',
           allDocsCount: docsService?.list?.docs$.value?.length ?? 0,
-          platform: typeof BUILD_CONFIG !== 'undefined' && BUILD_CONFIG.isElectron ? 'desktop' : 'web',
-          isMac: (globalThis as any).environment?.isMacOs ?? (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac')),
-          isMobile: (globalThis as any).environment?.isMobile ?? (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mobile')),
-          selectMode: typeof document !== 'undefined' ? !!document.querySelector('[data-select-mode="true"]') : false,
+          platform:
+            typeof BUILD_CONFIG !== 'undefined' && BUILD_CONFIG.isElectron
+              ? 'desktop'
+              : 'web',
+          isMac:
+            (globalThis as any).environment?.isMacOs ??
+            (typeof navigator !== 'undefined' &&
+              navigator.userAgent.toLowerCase().includes('mac')),
+          isMobile:
+            (globalThis as any).environment?.isMobile ??
+            (typeof navigator !== 'undefined' &&
+              navigator.userAgent.toLowerCase().includes('mobile')),
+          selectMode:
+            typeof document !== 'undefined'
+              ? !!document.querySelector('[data-select-mode="true"]')
+              : false,
         },
       },
       endpoint: Endpoint.StreamObject,
@@ -264,6 +277,38 @@ export function setupAIProvider(
       client,
       sessionId,
       content: options.input,
+    });
+  });
+
+  AIProvider.provide('generateCode', async options => {
+    const sessionId = await createSession({
+      promptName: 'Generate code by request',
+      ...options,
+    });
+    return textToText({
+      ...options,
+      client,
+      sessionId,
+      content: options.input,
+      params: {
+        instructions: options.instructions || '',
+      },
+    });
+  });
+
+  AIProvider.provide('editCode', async options => {
+    const sessionId = await createSession({
+      promptName: 'Edit/modify code',
+      ...options,
+    });
+    return textToText({
+      ...options,
+      client,
+      sessionId,
+      content: options.input,
+      params: {
+        instructions: options.instructions || '',
+      },
     });
   });
 

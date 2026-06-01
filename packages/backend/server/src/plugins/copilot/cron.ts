@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { JOB_SIGNAL, JobQueue, OneDay, OnJob } from '../../base';
@@ -17,13 +21,23 @@ declare global {
 }
 
 @Injectable()
-export class CopilotCronJobs {
+export class CopilotCronJobs implements OnApplicationBootstrap {
   private readonly logger = new Logger(CopilotCronJobs.name);
 
   constructor(
     private readonly models: Models,
     private readonly jobs: JobQueue
   ) {}
+
+  onApplicationBootstrap() {
+    // Proactively generate missing titles for existing "New Chat" sessions at startup once Redis/JobQueue are initialized
+    this.triggerGenerateMissingTitles().catch(err => {
+      this.logger.warn(
+        'Failed to auto-trigger missing title generation at startup',
+        err
+      );
+    });
+  }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async dailyCleanupJob() {

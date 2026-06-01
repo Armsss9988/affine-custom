@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 
 import type { PromptMessage, PromptParams } from '../providers/types';
 import {
@@ -15,12 +16,14 @@ import type { Prompt, PromptSpec, ResolvedPrompt } from './spec';
 @Injectable()
 export class PromptService {
   protected readonly logger = new Logger(PromptService.name);
-  constructor() {
-    this.logger.log('Using native built-in prompt catalog.');
+  constructor(@Optional() protected readonly prisma?: PrismaClient) {
+    this.logger.log(
+      'Using native built-in prompt catalog with db-backed lookupCompatPrompt.'
+    );
   }
 
   async get(name: string): Promise<ResolvedPrompt | null> {
-    const compatPrompt = this.lookupCompatPrompt(name);
+    const compatPrompt = await this.lookupCompatPrompt(name);
     if (compatPrompt) {
       return this.describeCompatPrompt(this.clonePrompt(compatPrompt));
     }
@@ -84,8 +87,26 @@ export class PromptService {
     return this.injectClientContext(rendered.messages, params);
   }
 
-  protected lookupCompatPrompt(_name: string): Prompt | null {
-    return null;
+  protected async lookupCompatPrompt(name: string): Promise<Prompt | null> {
+    if (!this.prisma) return null;
+    const prompt = await this.prisma.aiPrompt.findUnique({
+      where: { name },
+      include: { messages: { orderBy: { idx: 'asc' } } },
+    });
+    if (!prompt) return null;
+    return {
+      name: prompt.name,
+      model: prompt.model,
+      optionalModels: prompt.optionalModels,
+      action: prompt.action ?? undefined,
+      config: (prompt.config as any) ?? undefined,
+      messages: prompt.messages.map(msg => ({
+        role: msg.role.toLowerCase() as any,
+        content: msg.content ?? '',
+        attachments: (msg.attachments as any) ?? undefined,
+        params: (msg.params as any) ?? undefined,
+      })),
+    };
   }
 
   protected lookupBuiltInPromptSpec(name: string): PromptSpec | null {

@@ -273,6 +273,12 @@ declare global {
       generateCaption<T extends AITextActionOptions>(
         options: T
       ): Promise<AIActionTextResponse<T>>;
+      generateCode<T extends AITextActionOptions & { instructions?: string }>(
+        options: T
+      ): Promise<AIActionTextResponse<T>>;
+      editCode<T extends AITextActionOptions & { instructions?: string }>(
+        options: T
+      ): Promise<AIActionTextResponse<T>>;
     }
 
     type AIDocsAndFilesContext = {

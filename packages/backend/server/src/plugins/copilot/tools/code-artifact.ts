@@ -19,7 +19,7 @@ const logger = new Logger('CodeArtifactTool');
 export const createCodeArtifactTool = (prompt: RunPromptText) => {
   return defineTool({
     description:
-      'Generate a single-file HTML snippet (with inline <style> and <script>) that accomplishes the requested functionality. The final HTML should be runnable when saved as an .html file and opened in a browser. Do NOT reference external resources (CSS, JS, images) except through data URIs.',
+      'Generate an interactive visual dashboard, webpage mockup, or standalone single-page visual utility in a single HTML file (with Tailwind CSS, inline <style>, and <script>). ONLY use this tool when the user explicitly requests a visual application, user interface (UI), interactive page, or web dashboard mockup. DO NOT use this tool for writing generic backend scripts, python programs, command-line utilities, or snippets of programming code (like a sorting algorithm or simple utility function). For generic code, return it as standard markdown text code blocks.',
     inputSchema: z.object({
       /**
        * The <title> text that will appear in the browser tab.

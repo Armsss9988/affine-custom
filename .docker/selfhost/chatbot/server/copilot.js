@@ -650,6 +650,7 @@ router.post('/models/:modelName\\::action', async (req, res) => {
         type: 'function',
         function: { name: t.name, description: t.description || '', parameters: t.parameters || {} }
       }));
+      console.log(`[Copilot Gemini Proxy] ${requestId} received tools:`, openaiTools.map(t => t.function.name).join(', '));
     }
     const hasTools = openaiTools.length > 0;
 

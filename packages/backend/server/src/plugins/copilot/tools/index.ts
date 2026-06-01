@@ -25,3 +25,8 @@ export * from './url-content-read';
 export * from './web-search-free';
 export * from './wikipedia-search';
 export * from './workspace-info';
+export * from './tag-tools';
+export * from './favorite-tools';
+export * from './collection-tools';
+export * from './folder-tools';
+export * from './database-tools';

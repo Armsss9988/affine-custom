@@ -96,7 +96,7 @@
   {
     "name": "Summary as title",
     "action": "Summary as title",
-    "model": "gpt-5-mini",
+    "model": "gemini-2.5-flash",
     "messages": [
       {
         "role": "system",
@@ -588,6 +588,36 @@
     ]
   },
   {
+    "name": "Generate code by request",
+    "action": "Generate code by request",
+    "model": "gemini-2.5-flash",
+    "messages": [
+      {
+        "role": "system",
+        "template": "**Role:** Senior software engineer & code generator expert.\n\n**Task:** Write clean, elegant, and efficient code based on the user's specific request and instruction. If an existing code snippet or context is provided, build upon or adapt it as requested. Otherwise, write new code from scratch.\n\n**Output Requirements:**\n- ONLY return the pure code inside a markdown code block (e.g. using triple backticks and the language specifier).\n- DO NOT write any conversational text, explanations, greetings, or intro/outro sentences. Just output the code block.\n- Add helpful comments inside the code to explain complex logic."
+      },
+      {
+        "role": "user",
+        "template": "Instructions:\n\"{{instructions}}\"\n\nContext / existing code if any:\n{{>guarded_content}}"
+      }
+    ]
+  },
+  {
+    "name": "Edit/modify code",
+    "action": "Edit/modify code",
+    "model": "gemini-2.5-flash",
+    "messages": [
+      {
+        "role": "system",
+        "template": "**Role:** Senior software engineer & expert code refactoring assistant.\n\n**Task:** Meticulously modify, edit, or refactor the user's code according to their instructions. Keep the original structure, style, and programming language unless explicitly instructed to change them.\n\n**Output Requirements:**\n- ONLY return the modified code inside a markdown code block. Do NOT include markdown text outside of the code block.\n- DO NOT output any comments, greetings, intros, or descriptions outside of the code block. The response must contain exactly one markdown code block."
+      },
+      {
+        "role": "user",
+        "template": "Modify the code based on the instructions: \"{{instructions}}\"\n\nExisting code:\n{{>guarded_content}}"
+      }
+    ]
+  },
+  {
     "name": "Generate image",
     "action": "image",
     "model": "gpt-image-1",
@@ -717,11 +747,25 @@
         "docUpdateMeta",
         "docKeywordSearch",
         "docSemanticSearch",
-        "webSearch",
+        "docList",
+        "docDelete",
+        "docRestore",
+        "docInfo",
+        "docShareEnable",
+        "docShareDisable",
+        "commentList",
+        "commentCreate",
+        "commentReply",
+        "commentResolve",
+        "workspaceInfo",
+        "journalRead",
+        "journalWrite",
         "docCompose",
+        "sectionEdit",
+        "kanbanCreate",
         "codeArtifact",
         "blobRead",
-        "kanbanCreate",
+        "webSearch",
         "academicSearch",
         "arxivSearch",
         "webSearchFree",
@@ -729,7 +773,26 @@
         "wikipediaSearch",
         "citationFormat",
         "translateText",
-        "docSynthesis"
+        "docSynthesis",
+        "tagList",
+        "tagCreate",
+        "tagAddToDoc",
+        "tagRemoveFromDoc",
+        "favoriteList",
+        "favoriteAdd",
+        "favoriteRemove",
+        "collectionList",
+        "collectionCreate",
+        "collectionAddDoc",
+        "collectionRemoveDoc",
+        "folderList",
+        "folderCreate",
+        "folderAddDoc",
+        "folderRemoveDoc",
+        "databaseCreate",
+        "databaseQuery",
+        "databaseAddRow",
+        "databaseAddView"
       ],
       "proModels": [
         "gemini-2.5-pro",

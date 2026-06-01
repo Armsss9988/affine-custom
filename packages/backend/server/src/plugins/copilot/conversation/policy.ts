@@ -41,8 +41,9 @@ export class ConversationPolicy {
     return !(limit !== undefined && Number.isFinite(limit) && used >= limit);
   }
 
-  shouldScheduleTitle(prompt: Pick<ResolvedPrompt, 'action'>) {
-    return !prompt.action;
+  shouldScheduleTitle(_prompt: Pick<ResolvedPrompt, 'action'>) {
+    // Schedule title generation for all Copilot conversations (including main chat)
+    return true;
   }
 
   shouldGenerateTitle(input: { title: string | null; turns: Turn[] }) {
