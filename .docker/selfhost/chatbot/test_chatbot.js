@@ -162,7 +162,7 @@ async function runIntegrationTests() {
         model: 'stepfun-ai/step-3.5-flash',
         stream: false,
         messages: [{ role: 'user', content: 'Reply with exactly: STEPFUN_OK' }],
-        max_tokens: 20,
+        max_tokens: 512,
       },
       timeout: 20000,
     });
@@ -184,7 +184,7 @@ async function runIntegrationTests() {
         model: 'gemini-3.5-flash',
         stream: false,
         messages: [{ role: 'user', content: 'Reply with exactly: GEMINI_OK' }],
-        max_tokens: 20,
+        max_tokens: 512,
       },
       timeout: 20000,
     });
@@ -207,7 +207,7 @@ async function runIntegrationTests() {
       method: 'POST',
       body: {
         contents: [{ role: 'user', parts: [{ text: 'Say: VERTEX_OK' }] }],
-        generationConfig: { maxOutputTokens: 20 },
+        generationConfig: { maxOutputTokens: 512 },
       },
       timeout: 20000,
     });
@@ -232,7 +232,7 @@ async function runIntegrationTests() {
       method: 'POST',
       body: {
         contents: [{ role: 'user', parts: [{ text: 'Reply with: VERTEX_NONSTREAM_OK' }] }],
-        generationConfig: { maxOutputTokens: 30 },
+        generationConfig: { maxOutputTokens: 512 },
       },
       timeout: 20000,
     });
