@@ -979,45 +979,79 @@ Only output the final response back to the user after completing all tool calls.
       let textChunk = '';
       let toolCalls = [];
 
-      const reader = stream.getReader();
-      const decoder = new TextDecoder();
       let buffer = '';
+      await new Promise((resolve, reject) => {
+        stream.on('data', (chunk) => {
+          const chunkStr = typeof chunk === 'string' ? chunk : chunk.toString();
+          buffer += chunkStr;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6).trim();
-            if (dataStr === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(dataStr);
-              const delta = parsed.choices?.[0]?.delta;
-              if (delta?.content) {
-                textChunk += delta.content;
-                res.write(`data: ${JSON.stringify({ content: delta.content })}\n\n`);
-              }
-              if (delta?.tool_calls) {
-                for (const tc of delta.tool_calls) {
-                  const idx = tc.index;
-                  if (!toolCalls[idx]) {
-                    toolCalls[idx] = { id: tc.id, type: 'function', function: { name: '', arguments: '' } };
-                  }
-                  if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
-                  if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6).trim();
+              if (dataStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(dataStr);
+                const delta = parsed.choices?.[0]?.delta;
+                if (delta?.content) {
+                  textChunk += delta.content;
+                  res.write(`data: ${JSON.stringify({ content: delta.content })}\n\n`);
                 }
+                if (delta?.tool_calls) {
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index;
+                    if (!toolCalls[idx]) {
+                      toolCalls[idx] = { id: tc.id, type: 'function', function: { name: '', arguments: '' } };
+                    }
+                    if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
+                    if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                  }
+                }
+              } catch (e) {
+                // skip
               }
-            } catch (e) {
-              // skip
             }
           }
-        }
-      }
+        });
+
+        stream.on('end', () => {
+          if (buffer) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataStr = line.slice(6).trim();
+                if (dataStr === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  const delta = parsed.choices?.[0]?.delta;
+                  if (delta?.content) {
+                    textChunk += delta.content;
+                    res.write(`data: ${JSON.stringify({ content: delta.content })}\n\n`);
+                  }
+                  if (delta?.tool_calls) {
+                    for (const tc of delta.tool_calls) {
+                      const idx = tc.index;
+                      if (!toolCalls[idx]) {
+                        toolCalls[idx] = { id: tc.id, type: 'function', function: { name: '', arguments: '' } };
+                      }
+                      if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
+                      if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                    }
+                  }
+                } catch (e) {
+                  // skip
+                }
+              }
+            }
+          }
+          resolve();
+        });
+
+        stream.on('error', (err) => {
+          reject(err);
+        });
+      });
 
       toolCalls = toolCalls.filter(Boolean);
 
