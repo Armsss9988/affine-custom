@@ -15,6 +15,24 @@ import { IndexerService } from '../../indexer';
 import { CopilotContextService } from '../context/service';
 import { UiManifestService } from './ui-manifest.service';
 
+import {
+  buildTagListHandler,
+  buildTagCreateHandler,
+  buildTagAddToDocHandler,
+  buildTagRemoveFromDocHandler,
+} from '../tools/tag-tools';
+import {
+  buildFavoriteListHandler,
+  buildFavoriteAddHandler,
+  buildFavoriteRemoveHandler,
+} from '../tools/favorite-tools';
+import {
+  buildDatabaseCreateHandler,
+  buildDatabaseQueryHandler,
+  buildDatabaseAddRowHandler,
+  buildDatabaseAddViewHandler,
+} from '../tools/database-tools';
+
 type McpTextContent = {
   type: 'text';
   text: string;
@@ -2000,6 +2018,496 @@ export class WorkspaceMcpProvider {
       },
     });
 
+    // --- Tags Tools ---
+    const listTagsHandler = buildTagListHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const createTagHandler = buildTagCreateHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const addTagToDocHandler = buildTagAddToDocHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const removeTagFromDocHandler = buildTagRemoveFromDocHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+
+    const listTags = defineTool({
+      name: 'list_tags',
+      title: 'List Tags',
+      description:
+        'List all tags in the workspace. Returns tag IDs, values (names), and colors.',
+      parser: z.object({}),
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+      execute: async () => {
+        try {
+          const res = await listTagsHandler({
+            user: userId,
+            workspace: workspaceId,
+          });
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to list tags: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const createTag = defineTool({
+      name: 'create_tag',
+      title: 'Create Tag',
+      description: 'Create a new tag in the workspace.',
+      parser: z.object({ value: z.string().min(1) }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          value: {
+            type: 'string',
+            description: 'The name of the tag to create',
+          },
+        },
+        required: ['value'],
+        additionalProperties: false,
+      },
+      execute: async ({ value }) => {
+        try {
+          const res = await createTagHandler(
+            { user: userId, workspace: workspaceId },
+            value
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to create tag: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const addTagToDoc = defineTool({
+      name: 'add_tag_to_doc',
+      title: 'Add Tag to Document',
+      description: 'Add an existing tag to a document.',
+      parser: z.object({ docId: z.string(), tagId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          docId: { type: 'string', description: 'The ID of the document' },
+          tagId: { type: 'string', description: 'The ID of the tag to add' },
+        },
+        required: ['docId', 'tagId'],
+        additionalProperties: false,
+      },
+      execute: async ({ docId, tagId }) => {
+        try {
+          const res = await addTagToDocHandler(
+            { user: userId, workspace: workspaceId },
+            docId,
+            tagId
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to add tag to doc: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const removeTagFromDoc = defineTool({
+      name: 'remove_tag_from_doc',
+      title: 'Remove Tag from Document',
+      description: 'Remove a tag from a document.',
+      parser: z.object({ docId: z.string(), tagId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          docId: { type: 'string', description: 'The ID of the document' },
+          tagId: { type: 'string', description: 'The ID of the tag to remove' },
+        },
+        required: ['docId', 'tagId'],
+        additionalProperties: false,
+      },
+      execute: async ({ docId, tagId }) => {
+        try {
+          const res = await removeTagFromDocHandler(
+            { user: userId, workspace: workspaceId },
+            docId,
+            tagId
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to remove tag from doc: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    // --- Favorites Tools ---
+    const listFavoritesHandler = buildFavoriteListHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const addFavoriteHandler = buildFavoriteAddHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const removeFavoriteHandler = buildFavoriteRemoveHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+
+    const listFavorites = defineTool({
+      name: 'list_favorites',
+      title: 'List Favorites',
+      description: 'List all favorite items of the current user.',
+      parser: z.object({}),
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+      execute: async () => {
+        try {
+          const res = await listFavoritesHandler({
+            user: userId,
+            workspace: workspaceId,
+          });
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to list favorites: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const addFavorite = defineTool({
+      name: 'add_favorite',
+      title: 'Add Favorite',
+      description:
+        "Add an item (document, tag, or collection) to the user's favorites.",
+      parser: z.object({
+        type: z.enum(['doc', 'collection', 'tag']),
+        id: z.string(),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['doc', 'collection', 'tag'],
+            description: 'The type of item to favorite',
+          },
+          id: { type: 'string', description: 'The ID of the item to favorite' },
+        },
+        required: ['type', 'id'],
+        additionalProperties: false,
+      },
+      execute: async ({ type, id }) => {
+        try {
+          const res = await addFavoriteHandler(
+            { user: userId, workspace: workspaceId },
+            type,
+            id
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to add favorite: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const removeFavorite = defineTool({
+      name: 'remove_favorite',
+      title: 'Remove Favorite',
+      description:
+        "Remove an item (document, tag, or collection) from the user's favorites.",
+      parser: z.object({
+        type: z.enum(['doc', 'collection', 'tag']),
+        id: z.string(),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['doc', 'collection', 'tag'],
+            description: 'The type of item to unfavorite',
+          },
+          id: {
+            type: 'string',
+            description: 'The ID of the item to unfavorite',
+          },
+        },
+        required: ['type', 'id'],
+        additionalProperties: false,
+      },
+      execute: async ({ type, id }) => {
+        try {
+          const res = await removeFavoriteHandler(
+            { user: userId, workspace: workspaceId },
+            type,
+            id
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to remove favorite: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    // --- Database Tools ---
+    const createDatabaseHandler = buildDatabaseCreateHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const queryDatabaseHandler = buildDatabaseQueryHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const addDatabaseRowHandler = buildDatabaseAddRowHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+    const addDatabaseViewHandler = buildDatabaseAddViewHandler(
+      this.ac,
+      this.workspaceStorage,
+      {} as any
+    );
+
+    const createDatabase = defineTool({
+      name: 'create_database',
+      title: 'Create Database',
+      description:
+        'Create a new document with a database block (Grid/Table view by default). Define custom columns and initial row data.',
+      parser: z.object({
+        title: z.string().min(1),
+        columns: z.array(
+          z.object({
+            name: z.string(),
+            type: z.enum([
+              'title',
+              'rich-text',
+              'number',
+              'select',
+              'multi-select',
+              'date',
+              'checkbox',
+            ]),
+            options: z.array(z.string()).optional(),
+          })
+        ),
+        rows: z.array(z.object({ cells: z.record(z.any()) })).optional(),
+        viewMode: z.enum(['table', 'kanban']).optional().default('table'),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: {
+            type: 'string',
+            description: 'The title of the database document',
+          },
+          columns: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                type: {
+                  type: 'string',
+                  enum: [
+                    'title',
+                    'rich-text',
+                    'number',
+                    'select',
+                    'multi-select',
+                    'date',
+                    'checkbox',
+                  ],
+                },
+                options: { type: 'array', items: { type: 'string' } },
+              },
+              required: ['name', 'type'],
+            },
+          },
+          rows: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                cells: { type: 'object' },
+              },
+              required: ['cells'],
+            },
+          },
+          viewMode: {
+            type: 'string',
+            enum: ['table', 'kanban'],
+            default: 'table',
+          },
+        },
+        required: ['title', 'columns'],
+        additionalProperties: false,
+      },
+      execute: async ({ title, columns, rows, viewMode }) => {
+        try {
+          const res = await createDatabaseHandler(
+            { user: userId, workspace: workspaceId },
+            title,
+            columns,
+            rows,
+            viewMode
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to create database: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const queryDatabase = defineTool({
+      name: 'query_database',
+      title: 'Query Database',
+      description:
+        'Query and list the columns and rows of a database document.',
+      parser: z.object({ docId: z.string() }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          docId: {
+            type: 'string',
+            description: 'The ID of the document containing the database',
+          },
+        },
+        required: ['docId'],
+        additionalProperties: false,
+      },
+      execute: async ({ docId }) => {
+        try {
+          const res = await queryDatabaseHandler(
+            { user: userId, workspace: workspaceId },
+            docId
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to query database: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const addDatabaseRow = defineTool({
+      name: 'add_database_row',
+      title: 'Add Database Row',
+      description: 'Add a new row of data to an existing database document.',
+      parser: z.object({
+        docId: z.string(),
+        cells: z.record(z.any()),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          docId: {
+            type: 'string',
+            description: 'The ID of the database document',
+          },
+          cells: {
+            type: 'object',
+            description:
+              'Key-value pairs mapping column names to cell values to insert',
+          },
+        },
+        required: ['docId', 'cells'],
+        additionalProperties: false,
+      },
+      execute: async ({ docId, cells }) => {
+        try {
+          const res = await addDatabaseRowHandler(
+            { user: userId, workspace: workspaceId },
+            docId,
+            cells
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to add row to database: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
+    const addDatabaseView = defineTool({
+      name: 'add_database_view',
+      title: 'Add Database View',
+      description:
+        'Add a new view (table, kanban, gallery, or calendar) to an existing database.',
+      parser: z.object({
+        docId: z.string(),
+        name: z.string(),
+        mode: z.enum(['table', 'kanban', 'gallery', 'calendar']),
+      }),
+      inputSchema: {
+        type: 'object',
+        properties: {
+          docId: {
+            type: 'string',
+            description: 'The ID of the database document',
+          },
+          name: { type: 'string', description: 'The name of the new view' },
+          mode: {
+            type: 'string',
+            enum: ['table', 'kanban', 'gallery', 'calendar'],
+            description: 'Layout mode for the new view',
+          },
+        },
+        required: ['docId', 'name', 'mode'],
+        additionalProperties: false,
+      },
+      execute: async ({ docId, name, mode }) => {
+        try {
+          const res = await addDatabaseViewHandler(
+            { user: userId, workspace: workspaceId },
+            docId,
+            name,
+            mode
+          );
+          return toolText(JSON.stringify(res, null, 2));
+        } catch (error) {
+          return toolError(
+            `Failed to add database view: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      },
+    });
+
     tools.push(
       createDocument,
       updateDocument,
@@ -2016,7 +2524,18 @@ export class WorkspaceMcpProvider {
       addDocToFolder,
       removeDocFromFolder,
       webSearch,
-      urlContentRead
+      urlContentRead,
+      listTags,
+      createTag,
+      addTagToDoc,
+      removeTagFromDoc,
+      listFavorites,
+      addFavorite,
+      removeFavorite,
+      createDatabase,
+      queryDatabase,
+      addDatabaseRow,
+      addDatabaseView
     );
 
     return {

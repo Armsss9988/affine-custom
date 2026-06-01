@@ -495,4 +495,583 @@ router.post('/kanban/update', async (req, res) => {
   }
 });
 
+// 19. GET /api/tags - List all tags (calls list_tags MCP tool)
+router.get('/tags', async (req, res) => {
+  try {
+    const mcpResult = await callMcp('list_tags', {});
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error listing tags:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 20. POST /api/tags - Create a new tag (calls create_tag MCP tool)
+router.post('/tags', async (req, res) => {
+  const { value } = req.body;
+  if (!value) {
+    return res.status(400).json({ error: 'value is required' });
+  }
+  try {
+    const mcpResult = await callMcp('create_tag', { value });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error creating tag:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 21. POST /api/tags/add - Add tag to document (calls add_tag_to_doc MCP tool)
+router.post('/tags/add', async (req, res) => {
+  const { docId, tagId } = req.body;
+  if (!docId || !tagId) {
+    return res.status(400).json({ error: 'docId and tagId are required' });
+  }
+  try {
+    const mcpResult = await callMcp('add_tag_to_doc', { docId, tagId });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error adding tag to doc:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 22. POST /api/tags/remove - Remove tag from document (calls remove_tag_from_doc MCP tool)
+router.post('/tags/remove', async (req, res) => {
+  const { docId, tagId } = req.body;
+  if (!docId || !tagId) {
+    return res.status(400).json({ error: 'docId and tagId are required' });
+  }
+  try {
+    const mcpResult = await callMcp('remove_tag_from_doc', { docId, tagId });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error removing tag from doc:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 23. GET /api/favorites - List all favorites (calls list_favorites MCP tool)
+router.get('/favorites', async (req, res) => {
+  try {
+    const mcpResult = await callMcp('list_favorites', {});
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error listing favorites:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 24. POST /api/favorites/add - Add favorite (calls add_favorite MCP tool)
+router.post('/favorites/add', async (req, res) => {
+  const { type, id } = req.body;
+  if (!type || !id) {
+    return res.status(400).json({ error: 'type and id are required' });
+  }
+  try {
+    const mcpResult = await callMcp('add_favorite', { type, id });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error adding favorite:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 25. POST /api/favorites/remove - Remove favorite (calls remove_favorite MCP tool)
+router.post('/favorites/remove', async (req, res) => {
+  const { type, id } = req.body;
+  if (!type || !id) {
+    return res.status(400).json({ error: 'type and id are required' });
+  }
+  try {
+    const mcpResult = await callMcp('remove_favorite', { type, id });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error removing favorite:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 26. POST /api/databases - Create database (calls create_database MCP tool)
+router.post('/databases', async (req, res) => {
+  const { title, columns, rows, viewMode } = req.body;
+  if (!title || !columns) {
+    return res.status(400).json({ error: 'title and columns are required' });
+  }
+  try {
+    const mcpResult = await callMcp('create_database', { title, columns, rows, viewMode });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error creating database:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 27. GET /api/databases/:docId - Query database (calls query_database MCP tool)
+router.get('/databases/:docId', async (req, res) => {
+  const { docId } = req.params;
+  try {
+    const mcpResult = await callMcp('query_database', { docId });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error querying database:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 28. POST /api/databases/add-row - Add row to database (calls add_database_row MCP tool)
+router.post('/databases/add-row', async (req, res) => {
+  const { docId, cells } = req.body;
+  if (!docId || !cells) {
+    return res.status(400).json({ error: 'docId and cells are required' });
+  }
+  try {
+    const mcpResult = await callMcp('add_database_row', { docId, cells });
+    const text = mcpResult.content?.[0]?.text || '{}';
+    res.json(JSON.parse(text));
+  } catch (error) {
+    console.error('[Docs API] Error adding database row:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+});
+
+// 30. POST /api/copilot/chat - Unified Coordination Hub (Agentic multi-tool loop)
+router.post('/copilot/chat', async (req, res) => {
+  const { message } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: 'message is required' });
+  }
+
+  // Set up streaming response headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const WORKSPACE_TOOLS = [
+    {
+      type: 'function',
+      function: {
+        name: 'list_documents',
+        description: 'List all documents in the workspace. Returns docId, title, createdAt, and inTrash status.',
+        parameters: { type: 'object', properties: {} }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'read_document',
+        description: 'Read the markdown content of a document by its ID.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'The unique ID of the document' }
+          },
+          required: ['docId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_document',
+        description: 'Create a new document with the given title and body content.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Title of the document' },
+            content: { type: 'string', description: 'Markdown body content' }
+          },
+          required: ['title', 'content']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'update_document',
+        description: 'Update the body content (markdown) of an existing document. Does not change title.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'The unique ID of the document' },
+            content: { type: 'string', description: 'The complete new markdown body' }
+          },
+          required: ['docId', 'content']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'update_document_meta',
+        description: 'Update document metadata such as title.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'The unique ID of the document' },
+            title: { type: 'string', description: 'The new title' }
+          },
+          required: ['docId', 'title']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'list_folders',
+        description: 'List the hierarchical folder tree in the workspace.',
+        parameters: { type: 'object', properties: {} }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_folder',
+        description: 'Create a folder in the workspace.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'The name of the new folder' },
+            parentId: { type: 'string', description: 'Parent folder ID (optional)' }
+          },
+          required: ['name']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'add_doc_to_folder',
+        description: 'Move/add a document to a folder.',
+        parameters: {
+          type: 'object',
+          properties: {
+            folderId: { type: 'string', description: 'The ID of the folder' },
+            docId: { type: 'string', description: 'The ID of the document' }
+          },
+          required: ['folderId', 'docId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'remove_doc_from_folder',
+        description: 'Remove a document from a folder.',
+        parameters: {
+          type: 'object',
+          properties: {
+            folderId: { type: 'string', description: 'The ID of the folder' },
+            docId: { type: 'string', description: 'The ID of the document' }
+          },
+          required: ['folderId', 'docId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'list_tags',
+        description: 'List all tags in the workspace.',
+        parameters: { type: 'object', properties: {} }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_tag',
+        description: 'Create a new tag in the workspace.',
+        parameters: {
+          type: 'object',
+          properties: {
+            value: { type: 'string', description: 'The name of the tag' }
+          },
+          required: ['value']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'add_tag_to_doc',
+        description: 'Add a tag to a document.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'Document ID' },
+            tagId: { type: 'string', description: 'Tag ID' }
+          },
+          required: ['docId', 'tagId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'remove_tag_from_doc',
+        description: 'Remove a tag from a document.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'Document ID' },
+            tagId: { type: 'string', description: 'Tag ID' }
+          },
+          required: ['docId', 'tagId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'list_favorites',
+        description: 'List the current user\'s favorite documents, folders, tags, or collections.',
+        parameters: { type: 'object', properties: {} }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'add_favorite',
+        description: 'Favorite a document, tag, or collection.',
+        parameters: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['doc', 'collection', 'tag'], description: 'Item type' },
+            id: { type: 'string', description: 'Item ID' }
+          },
+          required: ['type', 'id']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'remove_favorite',
+        description: 'Unfavorite a document, tag, or collection.',
+        parameters: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['doc', 'collection', 'tag'], description: 'Item type' },
+            id: { type: 'string', description: 'Item ID' }
+          },
+          required: ['type', 'id']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_database',
+        description: 'Create a database document with custom schema and rows.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Title of the database document' },
+            columns: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  type: { type: 'string', enum: ['title', 'rich-text', 'number', 'select', 'multi-select', 'date', 'checkbox'] }
+                },
+                required: ['name', 'type']
+              }
+            },
+            rows: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  cells: { type: 'object' }
+                },
+                required: ['cells']
+              }
+            },
+            viewMode: { type: 'string', enum: ['table', 'kanban'] }
+          },
+          required: ['title', 'columns']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'query_database',
+        description: 'Query columns and rows of a database document.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'ID of the database document' }
+          },
+          required: ['docId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'add_database_row',
+        description: 'Add a new row to an existing database document.',
+        parameters: {
+          type: 'object',
+          properties: {
+            docId: { type: 'string', description: 'ID of the database document' },
+            cells: { type: 'object', description: 'Key-value cell pairs' }
+          },
+          required: ['docId', 'cells']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'web_search',
+        description: 'Perform a web search query (DuckDuckGo).',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search keywords' }
+          },
+          required: ['query']
+        }
+      }
+    }
+  ];
+
+  try {
+    const { geminiChatStream } = require('./gemini');
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an agentic workspace assistant for AFFiNE. You have direct access to the workspace via tools. 
+When the user asks to manage documents, folders, tags, favorites, databases, or search the web, use the appropriate tools.
+If you need to retrieve document list first before searching or reading, do so.
+Always perform multi-step planning (e.g. if the user says "Add doc titled Project X, add it to folder Work, tag it important", create the document, get folders list, add the document to the folder, create/add tag).
+Only output the final response back to the user after completing all tool calls.`
+      },
+      { role: 'user', content: message }
+    ];
+
+    let loopCount = 0;
+    const maxLoops = 10;
+
+    while (loopCount < maxLoops) {
+      loopCount++;
+      console.log(`[Coordination Hub] Loop ${loopCount}...`);
+
+      const stream = await geminiChatStream(messages, {
+        tools: WORKSPACE_TOOLS,
+        temperature: 0.1
+      });
+
+      let textChunk = '';
+      let toolCalls = [];
+
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (dataStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(dataStr);
+              const delta = parsed.choices?.[0]?.delta;
+              if (delta?.content) {
+                textChunk += delta.content;
+                res.write(`data: ${JSON.stringify({ content: delta.content })}\n\n`);
+              }
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index;
+                  if (!toolCalls[idx]) {
+                    toolCalls[idx] = { id: tc.id, type: 'function', function: { name: '', arguments: '' } };
+                  }
+                  if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
+                  if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                }
+              }
+            } catch (e) {
+              // skip
+            }
+          }
+        }
+      }
+
+      toolCalls = toolCalls.filter(Boolean);
+
+      if (toolCalls.length === 0) {
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
+
+      const assistantMessage = { role: 'assistant', tool_calls: toolCalls };
+      messages.push(assistantMessage);
+
+      for (const toolCall of toolCalls) {
+        const name = toolCall.function.name;
+        let args = {};
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (e) {
+          console.error(`[Coordination Hub] Error parsing arguments for ${name}:`, toolCall.function.arguments);
+        }
+
+        console.log(`[Coordination Hub] Executing tool ${name} with args`, args);
+        res.write(`data: ${JSON.stringify({ status: `Calling tool: ${name}...` })}\n\n`);
+
+        let toolResultText = '';
+        try {
+          const mcpResult = await callMcp(name, args);
+          const content = mcpResult.content || [];
+          toolResultText = content.map(item => item.text).join('\n');
+        } catch (err) {
+          console.error(`[Coordination Hub] Tool execution failed for ${name}:`, err);
+          toolResultText = `Error: ${err.message}`;
+        }
+
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: name,
+          content: toolResultText
+        });
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ content: '\nMax tool execution loop limit reached.' })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+
+  } catch (error) {
+    console.error('[Coordination Hub] Error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+});
+
 module.exports = router;

@@ -5,7 +5,6 @@ import { unsafeCSSVarV2 } from '@blocksuite/affine/shared/theme';
 import { ShadowlessElement } from '@blocksuite/std';
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
-import { styleMap } from 'lit/directives/style-map.js';
 
 // Predefined Judge0 Language IDs
 const JUDGE0_LANG_IDS: Record<string, number> = {
@@ -20,6 +19,63 @@ const JUDGE0_LANG_IDS: Record<string, number> = {
   go: 60, // Go (1.13.5)
   bash: 46, // Bash (5.0.0)
 };
+
+// Standard Python libraries to exclude from micropip install
+const PYTHON_STD_LIBS = new Set([
+  'os',
+  'sys',
+  'math',
+  'time',
+  'json',
+  're',
+  'random',
+  'datetime',
+  'collections',
+  'itertools',
+  'functools',
+  'typing',
+  'hashlib',
+  'sqlite3',
+  'pickle',
+  'csv',
+  'urllib',
+  'http',
+  'socket',
+  'struct',
+  'binascii',
+  'shutil',
+  'glob',
+  'fnmatch',
+  'subprocess',
+  'threading',
+  'multiprocessing',
+  'queue',
+  'traceback',
+  'logging',
+  'argparse',
+  'uuid',
+  'base64',
+  'copy',
+  'decimal',
+  'fractions',
+  'statistics',
+  'io',
+  'pathlib',
+  'tempfile',
+  'zipfile',
+  'tarfile',
+  'xml',
+  'platform',
+  'unittest',
+  'mock',
+  'abc',
+  'contextlib',
+  'inspect',
+  'warnings',
+  'weakref',
+  'gc',
+  'sysconfig',
+]);
 
 // Monaco dynamic CDN loader
 let monacoLoadingPromise: Promise<any> | null = null;
@@ -93,7 +149,8 @@ function loadTypeScriptTranspiler(): Promise<any> {
 
   tsLoadingPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/typescript/5.0.4/typescript.min.js';
+    script.src =
+      'https://cdnjs.cloudflare.com/ajax/libs/typescript/5.0.4/typescript.min.js';
     script.onload = () => resolve((window as any).ts);
     script.onerror = err => reject(err);
     document.body.appendChild(script);
@@ -360,7 +417,7 @@ export class PlaygroundPreview extends SignalWatcher(
   accessor model: CodeBlockModel | null = null;
 
   @property({ attribute: true })
-  accessor lang: string = 'python';
+  override accessor lang: string = 'python';
 
   @state()
   accessor executionState: 'idle' | 'running' | 'success' | 'error' = 'idle';
@@ -524,6 +581,61 @@ export class PlaygroundPreview extends SignalWatcher(
     this.executionState = 'idle';
   }
 
+  private static _isValidPackageName(name: string): boolean {
+    if (
+      name.startsWith('.') ||
+      name.startsWith('/') ||
+      name.startsWith('http:') ||
+      name.startsWith('https:')
+    ) {
+      return false;
+    }
+    return /^[a-z0-9@][a-z0-9-_./]*$/i.test(name);
+  }
+
+  private static _findImports(code: string): string[] {
+    const imports = new Set<string>();
+    const staticImportRegex =
+      /import\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+    let match;
+    while ((match = staticImportRegex.exec(code)) !== null) {
+      const pkg = match[1];
+      if (pkg && PlaygroundPreview._isValidPackageName(pkg)) {
+        imports.add(pkg);
+      }
+    }
+    const dynamicImportRegex = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    while ((match = dynamicImportRegex.exec(code)) !== null) {
+      const pkg = match[1];
+      if (pkg && PlaygroundPreview._isValidPackageName(pkg)) {
+        imports.add(pkg);
+      }
+    }
+    return Array.from(imports);
+  }
+
+  private static _findPythonImports(code: string): string[] {
+    const imports = new Set<string>();
+    const lines = code.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('import ')) {
+        const parts = trimmed.substring(7).split(',');
+        for (const part of parts) {
+          const subpart = part.trim().split(/\s+/)[0];
+          if (subpart) imports.add(subpart);
+        }
+      } else if (trimmed.startsWith('from ')) {
+        const match = trimmed.match(/^from\s+([a-zA-Z0-9_.-]+)/);
+        if (match && match[1]) {
+          const rootPkg = match[1].split('.')[0];
+          if (rootPkg) imports.add(rootPkg);
+        }
+      }
+    }
+    return Array.from(imports);
+  }
+
   private async _runJSOrTSInBrowser(code: string, isTS: boolean) {
     let jsCode = code;
     if (isTS) {
@@ -533,8 +645,8 @@ export class PlaygroundPreview extends SignalWatcher(
         const ts = (window as any).ts;
         const result = ts.transpileModule(code, {
           compilerOptions: {
-            module: 1,
-            target: 2,
+            module: ts.ModuleKind?.ESNext ?? 99,
+            target: ts.ScriptTarget?.ESNext ?? 99,
           },
         });
         jsCode = result.outputText;
@@ -548,6 +660,16 @@ export class PlaygroundPreview extends SignalWatcher(
 
     this.consoleWelcomeMsg = 'Executing JavaScript sandbox...';
 
+    const imports = PlaygroundPreview._findImports(jsCode);
+    const importsMap: Record<string, string> = {};
+    for (const pkg of imports) {
+      importsMap[pkg] = `https://esm.sh/${pkg}`;
+    }
+    const importMapHtml =
+      Object.keys(importsMap).length > 0
+        ? `<script type="importmap">${JSON.stringify({ imports: importsMap })}</script>`
+        : '';
+
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.sandbox = 'allow-scripts';
@@ -556,36 +678,79 @@ export class PlaygroundPreview extends SignalWatcher(
     const htmlContent = `
       <!DOCTYPE html>
       <html>
-      <head><meta charset="utf-8"></head>
+      <head>
+        <meta charset="utf-8">
+        ${importMapHtml}
+      </head>
       <body>
         <script>
-          const logs = [];
-          const errors = [];
+          window.__logs = [];
+          window.__errors = [];
+          window.__startTime = performance.now();
+          window.__hasError = false;
           
           const originalLog = console.log;
           console.log = (...args) => {
-            logs.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
+            window.__logs.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
             originalLog.apply(console, args);
           };
           console.error = (...args) => {
-            errors.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
+            window.__errors.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
           };
-          window.onerror = (message) => {
-            errors.push(message);
+          window.onerror = (message, source, lineno, colno, error) => {
+            window.__hasError = true;
+            const errMsg = error ? error.stack : message;
+            window.__errors.push(errMsg);
+            window.parent.postMessage({
+              type: 'js-exec-result',
+              logs: window.__logs,
+              errors: window.__errors,
+              time: Math.round(performance.now() - window.__startTime)
+            }, '*');
+            return true;
+          };
+          window.addEventListener('unhandledrejection', (event) => {
+            window.__hasError = true;
+            const errMsg = event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'Unhandled promise rejection';
+            window.__errors.push(errMsg);
+            window.parent.postMessage({
+              type: 'js-exec-result',
+              logs: window.__logs,
+              errors: window.__errors,
+              time: Math.round(performance.now() - window.__startTime)
+            }, '*');
+          });
+          window.require = (name) => {
+            throw new Error("CommonJS 'require(\\"" + name + "\\")' is not supported in the browser sandbox. Please use ESM 'import " + name + " from \\\"" + name + "\\\"' instead.");
           };
 
-          window.addEventListener('message', (e) => {
+          window.addEventListener('message', async (e) => {
             const { jsCode } = e.data;
-            const startTime = performance.now();
             try {
-              const fn = new Function(jsCode);
-              fn();
-              const time = Math.round(performance.now() - startTime);
-              window.parent.postMessage({ type: 'js-exec-result', logs, errors, time }, '*');
+              const blob = new Blob([jsCode], { type: 'application/javascript' });
+              const url = URL.createObjectURL(blob);
+              await import(url);
+              URL.revokeObjectURL(url);
+              
+              setTimeout(() => {
+                if (!window.__hasError) {
+                  window.parent.postMessage({
+                    type: 'js-exec-result',
+                    logs: window.__logs,
+                    errors: window.__errors,
+                    time: Math.round(performance.now() - window.__startTime)
+                  }, '*');
+                }
+              }, 100);
             } catch (err) {
-              errors.push(err.message);
-              const time = Math.round(performance.now() - startTime);
-              window.parent.postMessage({ type: 'js-exec-result', logs, errors, time }, '*');
+              window.__hasError = true;
+              window.__errors.push(err.stack || err.message || err);
+              window.parent.postMessage({
+                type: 'js-exec-result',
+                logs: window.__logs,
+                errors: window.__errors,
+                time: Math.round(performance.now() - window.__startTime)
+              }, '*');
             }
           });
         </script>
@@ -593,7 +758,7 @@ export class PlaygroundPreview extends SignalWatcher(
       </html>
     `;
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>(resolve => {
       const timeoutId = setTimeout(() => {
         window.removeEventListener('message', listener);
         iframe.remove();
@@ -638,22 +803,42 @@ export class PlaygroundPreview extends SignalWatcher(
   private async _runPythonInBrowser(code: string) {
     this.consoleWelcomeMsg = 'Loading Python engine (WebAssembly)...';
     const pyodide = await loadPyodide();
-    
+
+    // Parse Python imports and filter out standard libraries
+    const imports = PlaygroundPreview._findPythonImports(code);
+    const pkgsToInstall = imports.filter(pkg => !PYTHON_STD_LIBS.has(pkg));
+
+    if (pkgsToInstall.length > 0) {
+      this.consoleWelcomeMsg = `Resolving and installing Python packages: ${pkgsToInstall.join(', ')}...`;
+      try {
+        await pyodide.loadPackage('micropip');
+        const micropip = pyodide.pyimport('micropip');
+        await micropip.install(pkgsToInstall);
+      } catch (err: any) {
+        this.stderr = `Package Installation Error: ${err.message}`;
+        this.executionState = 'error';
+        this.consoleWelcomeMsg = '';
+        return;
+      }
+    }
+
     let pyStdout = '';
     let pyStderr = '';
-    
+
     const decoder = new TextDecoder();
     pyodide.setStdout({
       write: (buffer: any) => {
-        const text = typeof buffer === 'string' ? buffer : decoder.decode(buffer);
+        const text =
+          typeof buffer === 'string' ? buffer : decoder.decode(buffer);
         pyStdout += text;
         return buffer.length;
       },
     });
-    
+
     pyodide.setStderr({
       write: (buffer: any) => {
-        const text = typeof buffer === 'string' ? buffer : decoder.decode(buffer);
+        const text =
+          typeof buffer === 'string' ? buffer : decoder.decode(buffer);
         pyStderr += text;
         return buffer.length;
       },
@@ -701,7 +886,10 @@ export class PlaygroundPreview extends SignalWatcher(
     const isDefaultEndpoint = this.apiEndpoint.includes('localhost:2358');
 
     // 1. If it's JS/TS/Python and using default endpoint, execute in-browser
-    if (isDefaultEndpoint && ['javascript', 'typescript', 'python'].includes(this.lang)) {
+    if (
+      isDefaultEndpoint &&
+      ['javascript', 'typescript', 'python'].includes(this.lang)
+    ) {
       this.consoleWelcomeMsg = `Running in browser sandbox (${this.lang === 'python' ? 'WebAssembly' : 'iframe'})...`;
       try {
         if (this.lang === 'python') {
@@ -718,7 +906,10 @@ export class PlaygroundPreview extends SignalWatcher(
     }
 
     // 2. For non-supported languages with default endpoint, fail gracefully with clean instructions
-    if (isDefaultEndpoint && !['javascript', 'typescript', 'python'].includes(this.lang)) {
+    if (
+      isDefaultEndpoint &&
+      !['javascript', 'typescript', 'python'].includes(this.lang)
+    ) {
       this.stderr = `Execution Failed: No Judge0 sandbox is running at ${this.apiEndpoint}.\n\nTo execute ${this.lang.toUpperCase()} code:\n1. Spin up a Judge0 service on your local machine, OR\n2. Click the Gear Icon ⚙️ (Playground Settings) next to the Run button to configure a remote Judge0 API endpoint and token.`;
       this.executionState = 'error';
       this.consoleWelcomeMsg = '';
