@@ -144,11 +144,14 @@ function getVertexEndpoint(model, action) {
     // Only works with a valid API key, not ADC
     throw new Error('[Gemini] VERTEX_PROJECT is not set. Please set VERTEX_PROJECT in .env');
   }
-  // Use /publishers/google/models/ path (no project/location needed for public models)
-  // This works with any valid access token from ADC
+  // gemini-3.5-flash requires 'global' location as of May 2026.
+  const location = model.includes('gemini-3.5-flash') ? 'global' : VERTEX_LOCATION;
+  const isGlobal = location === 'global';
+  const hostname = isGlobal ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+
   return {
-    hostname: `${VERTEX_LOCATION}-aiplatform.googleapis.com`,
-    path: `/v1/projects/${VERTEX_PROJECT}/locations/${VERTEX_LOCATION}/publishers/google/models/${model}:${action}`,
+    hostname,
+    path: `/v1/projects/${VERTEX_PROJECT}/locations/${location}/publishers/google/models/${model}:${action}`,
   };
 }
 
