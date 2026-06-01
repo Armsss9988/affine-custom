@@ -5,7 +5,11 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "ingest": "node server/ingest.js"
+    "ingest": "node server/ingest.js",
+    "test": "node test_chatbot.js",
+    "test:unit": "node test_chatbot.js --unit",
+    "test:local": "BASE_URL=http://localhost:3099 node test_chatbot.js",
+    "test:prod": "BASE_URL=http://168.138.167.9:3099 node test_chatbot.js"
   },
   "dependencies": {
     "express": "^4.21.0",
