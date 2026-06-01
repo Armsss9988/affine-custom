@@ -135,6 +135,12 @@ export function resolveProviderModelSelection(
           backendKind: context.backendKind,
           modelId: 'gemini-2.5-flash',
         }).variant;
+        if (!resolved) {
+          resolved = llmResolveModelRegistryVariant({
+            backendKind: context.backendKind,
+            modelId: 'gemini-1.5-flash',
+          }).variant;
+        }
         if (resolved) {
           resolved.rawModelId = 'gemini-3.5-flash';
           resolved.displayName = 'Gemini 3.5 Flash';
@@ -142,13 +148,22 @@ export function resolveProviderModelSelection(
         }
       } else if (modelId === 'stepfun-3.5') {
         resolved = llmResolveModelRegistryVariant({
-          backendKind: context.backendKind,
+          backendKind: 'openai_responses',
           modelId: 'gpt-4o',
         }).variant;
+        if (!resolved) {
+          resolved = llmResolveModelRegistryVariant({
+            backendKind: 'openai_responses',
+            modelId: 'gpt-3.5-turbo',
+          }).variant;
+        }
         if (resolved) {
           resolved.rawModelId = 'stepfun-3.5';
           resolved.displayName = 'StepFun 3.5';
           resolved.canonicalKey = 'stepfun-3.5';
+          resolved.backendKind = context.backendKind;
+          resolved.protocol = 'openai_chat';
+          resolved.requestLayer = 'chat_completions';
         }
       }
     }

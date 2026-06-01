@@ -9,7 +9,7 @@
       "openai": {
         "apiKey": "nim-proxy-key",
         "baseURL": "http://affine_chatbot:3099/v1",
-        "oldApiStyle": true
+        "oldApiStyle": false
       },
       "gemini": {
         "apiKey": "AIzaSyAF1KrcUQ9Q4FD9TY65Jg5eDLnbkPO74PE",

@@ -64,4 +64,13 @@ test('resolveProviderModel custom models mapping', t => {
   t.is(stepfunModel?.id, 'stepfun-3.5');
   t.is(stepfunModel?.name, 'StepFun 3.5');
   t.is(stepfunModel?.canonicalKey, 'stepfun-3.5');
+
+  const stepfunChatModel = resolveProviderModel(
+    { type: CopilotProviderType.OpenAI, backendKind: 'openai_chat' },
+    'stepfun-3.5'
+  );
+  t.truthy(stepfunChatModel);
+  t.is(stepfunChatModel?.id, 'stepfun-3.5');
+  t.is(stepfunChatModel?.name, 'StepFun 3.5');
+  t.is(stepfunChatModel?.canonicalKey, 'stepfun-3.5');
 });
