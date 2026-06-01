@@ -13,7 +13,7 @@
  *   node test_chatbot.js --unit                 # chỉ unit tests (không cần server)
  */
 
-const BASE_URL = process.env.BASE_URL || 'http://168.138.167.9:3099';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3099';
 const ONLY_UNIT = process.argv.includes('--unit');
 
 // ─── Colors ───────────────────────────────────────────────────────────────────

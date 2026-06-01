@@ -109,6 +109,26 @@ export const TranscriptionSubmitInputSchema = TranscriptionPayloadV2Schema.pick(
   }
 );
 
+function fixSchemaTypes(schema: any): any {
+  if (schema === true) {
+    return { type: 'object', properties: {}, additionalProperties: true };
+  }
+  if (schema === false) {
+    return { not: {} };
+  }
+  if (schema && typeof schema === 'object') {
+    if (Array.isArray(schema)) {
+      return schema.map(fixSchemaTypes);
+    }
+    const fixed: any = {};
+    for (const key of Object.keys(schema)) {
+      fixed[key] = fixSchemaTypes(schema[key]);
+    }
+    return fixed;
+  }
+  return schema;
+}
+
 function buildRequiredStructuredContract(schema: Record<string, unknown>) {
   const contract = buildStructuredResponseFromSchemaJson(schema);
   if (!contract.responseSchemaJson || !contract.schemaHash) {
@@ -122,7 +142,7 @@ function buildRequiredStructuredContract(schema: Record<string, unknown>) {
 }
 
 export const TranscriptActionResultContract = buildRequiredStructuredContract(
-  llmGetContractSchema('transcriptGeneratedResult')
+  fixSchemaTypes(llmGetContractSchema('transcriptGeneratedResult'))
 );
 
 type CanonicalTranscriptPayload = z.infer<typeof TranscriptionPayloadV2Schema>;

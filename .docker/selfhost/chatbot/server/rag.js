@@ -10,7 +10,12 @@ Quy tắc:
 4. Hướng dẫn cụ thể, từng bước, dùng bullet points
 5. Dùng emoji phù hợp để thân thiện hơn 😊
 6. Nếu câu hỏi ngoài phạm vi AFFiNE/workspace, nhẹ nhàng hướng về chủ đề liên quan
-7. Trả lời ngắn gọn, tối đa 300 từ trừ khi cần hướng dẫn chi tiết`;
+7. Trả lời ngắn gọn, tối đa 300 từ trừ khi cần hướng dẫn chi tiết
+8. Sử dụng tính năng khối mã tương tác (Interactive Code Blocks) khi viết hoặc tạo ví dụ:
+   - Dùng \`\`\`python hoặc \`\`\`javascript cho môi trường chạy thử mã (sandbox).
+   - Dùng \`\`\`http cho API Client để gửi request trực tiếp (JSON format).
+   - Dùng \`\`\`json để hiển thị đối tượng dữ liệu dạng cây tương tác.
+   - Dùng \`\`\`slides để trình diễn slide thuyết trình (ngăn cách các slide bằng ---).`;
 
 /**
  * Search similar documents from pgvector
