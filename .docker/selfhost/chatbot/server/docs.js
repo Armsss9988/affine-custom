@@ -644,8 +644,6 @@ router.post('/databases/add-row', async (req, res) => {
   }
 });
 
-});
-
 // 30. POST /api/copilot/chat - Unified Coordination Hub (Agentic multi-tool loop)
 router.post('/copilot/chat', async (req, res) => {
   const { message } = req.body;
