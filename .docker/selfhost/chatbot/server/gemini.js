@@ -302,6 +302,7 @@ async function geminiChatStream(messages, options = {}) {
             const parsed = JSON.parse(data);
             const candidate = parsed.candidates?.[0];
             if (!candidate) continue;
+            console.log("[Gemini Stream] candidate:", JSON.stringify(candidate));
             const openaiChunk = geminiChunkToOpenAI(candidate, model);
             readable.push(`data: ${JSON.stringify(openaiChunk)}\n\n`);
           } catch {}
