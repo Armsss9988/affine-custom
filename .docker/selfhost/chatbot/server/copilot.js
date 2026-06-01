@@ -1,8 +1,72 @@
 const express = require('express');
 const { chatStream, chatComplete } = require('./nim');
+const { geminiChatStream, geminiChatComplete, GEMINI_MODEL } = require('./gemini');
 
 const router = express.Router();
-const LLM_MODEL = process.env.NIM_LLM_MODEL || 'stepfun-ai/step-3.5-flash';
+const NIM_MODEL = process.env.NIM_LLM_MODEL || 'stepfun-ai/step-3.5-flash';
+const LLM_MODEL = NIM_MODEL; // kept for backward compat in log messages
+
+// ─── Smart routing helpers ────────────────────────────────────────────────────
+/**
+ * Return true if the model should be served by Vertex AI / Gemini backend.
+ * Patterns: gemini-*, text-embedding-*, gemini-embedding-*
+ */
+function isGeminiModel(modelName) {
+  if (!modelName) return false;
+  const m = modelName.toLowerCase();
+  return m.startsWith('gemini') || m.startsWith('text-embedding') || m.startsWith('gemini-embedding');
+}
+
+/**
+ * Resolve the final model name:
+ * - For Gemini models → keep as-is (Vertex uses real model names)
+ * - For anything else → remap to NIM_MODEL
+ */
+function resolveModel(requestedModel) {
+  if (isGeminiModel(requestedModel)) {
+    console.log(`[Copilot Proxy] Gemini route: ${requestedModel} → Vertex AI`);
+    return { model: requestedModel, backend: 'gemini' };
+  }
+  const mapped = requestedModel || NIM_MODEL;
+  if (mapped !== requestedModel && requestedModel) {
+    console.log(`[Copilot Proxy] NIM route: ${requestedModel} → ${NIM_MODEL}`);
+  }
+  return { model: NIM_MODEL, backend: 'nim' };
+}
+
+/** Backward-compat alias — just pick NIM model */
+function remapModel(requestedModel) {
+  return resolveModel(requestedModel).model;
+}
+
+const INTERACTIVE_BLOCKS_GUIDE = `
+[AFFiNE INTERACTIVE BLOCKS SYSTEM GUIDE]
+You are running inside AFFiNE, a next-gen collaborative workspace.
+When generating or modifying document pages, you should use standard Markdown fenced code blocks to trigger powerful interactive widgets:
+1. For standard programming code or interactive code play, use:
+   \`\`\`python
+   # Python execution sandbox
+   \`\`\`
+   or
+   \`\`\`javascript
+   // JS execution sandbox
+   \`\`\`
+2. For testing API requests and letting users send HTTP requests directly, use:
+   \`\`\`http
+   { "method": "GET", "url": "https://example.com" }
+   \`\`\`
+3. For displaying structured data, trees, or collapsible configuration lists, use:
+   \`\`\`json
+   { "key": "value" }
+   \`\`\`
+4. For creating presentations or slide decks, use:
+   \`\`\`slides
+   # Slide 1
+   ---
+   # Slide 2
+   \`\`\`
+Use these blocks appropriately whenever the user's request fits one of these use cases (e.g. they want a code playground, an API request tool, a structured data tree explorer, or slide presentation slides). Do not write any conversational text or filler outside of the document body.
+`;
 
 /**
  * Remap any model name requested by AFFiNE to the actual NIM LLM model.
@@ -48,11 +112,12 @@ function responsesInputToMessages(input, instructions, hasTools = false) {
     } else {
       systemPrompt += '\n\nOutput ONLY the final user-facing content. Do NOT include reasoning, analysis, <think> tags, or conversational filler like "Okay" or "I understand".';
     }
+    systemPrompt += '\n' + INTERACTIVE_BLOCKS_GUIDE;
     messages.push({ role: 'system', content: systemPrompt });
   } else if (hasTools) {
-    messages.push({ role: 'system', content: 'You are a helpful assistant with tools.' });
+    messages.push({ role: 'system', content: 'You are a helpful assistant with tools.\n' + INTERACTIVE_BLOCKS_GUIDE });
   } else {
-    messages.push({ role: 'system', content: 'Output only the final user-facing content. Do not include reasoning, analysis, or <think> tags.' });
+    messages.push({ role: 'system', content: 'Output only the final user-facing content. Do not include reasoning, analysis, or <think> tags.\n' + INTERACTIVE_BLOCKS_GUIDE });
   }
 
   if (typeof input === 'string') {
@@ -110,11 +175,11 @@ function genResponseId() {
 
 // ─── Endpoints ─────────────────────────────────────────────
 
-// 1. Models Endpoint — advertise NIM model under its real name AND all common aliases
-//    so AFFiNE's model picker always finds a valid option
+// 1. Models Endpoint — advertise both NIM + Gemini models
 router.get('/models', (req, res) => {
   const ts = Math.floor(Date.now() / 1000);
-  const aliases = ['gpt-4o', 'gpt-4o-mini', 'gpt-4', 'gemini-2.5-flash', 'gemini-2.0-flash', 'claude-3-5-sonnet', 'gemini-embedding-001', 'text-embedding-3-small'];
+  const geminiModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'text-embedding-004', 'gemini-embedding-001'];
+  const nimAliases = ['gpt-4o', 'gpt-4o-mini', 'text-embedding-3-small'];
   
   console.log(`[Models Endpoint] req.originalUrl=${req.originalUrl}, req.baseUrl=${req.baseUrl}`);
   
@@ -122,8 +187,9 @@ router.get('/models', (req, res) => {
     // Gemini format
     return res.json({
       models: [
-        { name: `models/${LLM_MODEL}` },
-        ...aliases.map(id => ({ name: `models/${id}` }))
+        ...geminiModels.map(id => ({ name: `models/${id}` })),
+        { name: `models/${NIM_MODEL}` },
+        ...nimAliases.map(id => ({ name: `models/${id}` }))
       ]
     });
   }
@@ -132,25 +198,59 @@ router.get('/models', (req, res) => {
   res.json({
     object: 'list',
     data: [
-      { id: LLM_MODEL, object: 'model', created: ts, owned_by: 'nvidia-nim' },
-      ...aliases.map(id => ({ id, object: 'model', created: ts, owned_by: 'proxy' })),
+      { id: NIM_MODEL, object: 'model', created: ts, owned_by: 'nvidia-nim' },
+      ...geminiModels.map(id => ({ id, object: 'model', created: ts, owned_by: 'google-vertex' })),
+      ...nimAliases.map(id => ({ id, object: 'model', created: ts, owned_by: 'proxy' })),
     ],
   });
 });
 
-// 2. Chat Completions Endpoint (legacy, kept for compatibility)
+// ─── Shared stream pipe helper ───────────────────────────────────────────────
+async function pipeStream(backendStream, res) {
+  const reader = backendStream.getReader ? backendStream.getReader() : null;
+  if (reader) {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') { res.write('data: [DONE]\n\n'); continue; }
+          try {
+            const parsed = JSON.parse(data);
+            parsed.id = parsed.id || `chatcmpl-${Date.now()}`;
+            parsed.object = 'chat.completion.chunk';
+            res.write(`data: ${JSON.stringify(parsed)}\n\n`);
+          } catch (e) {
+            res.write(`data: ${data}\n\n`);
+          }
+        }
+      }
+    }
+  } else {
+    for await (const chunk of backendStream) {
+      const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString();
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if (line.startsWith('data: ')) res.write(`${line}\n`);
+      }
+    }
+  }
+}
+
+// 2. Chat Completions Endpoint — smart routes to Gemini or NIM
 router.post('/chat/completions', async (req, res) => {
   const { messages, stream, model: rawModel, temperature, max_tokens, max_output_tokens } = req.body;
-  const _model = remapModel(rawModel); // remap but NIM uses env var model internally
-  const nimOptions = {
-    temperature,
-    max_tokens: max_tokens || max_output_tokens || 4096
-  };
+  const { model, backend } = resolveModel(rawModel);
+  const opts = { model, temperature, max_tokens: max_tokens || max_output_tokens || 4096 };
 
   if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({
-      error: { message: 'messages array is required', type: 'invalid_request_error' }
-    });
+    return res.status(400).json({ error: { message: 'messages array is required', type: 'invalid_request_error' } });
   }
 
   try {
@@ -160,48 +260,16 @@ router.post('/chat/completions', async (req, res) => {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
 
-      const nimStream = await chatStream(messages, nimOptions);
-      const reader = nimStream.getReader ? nimStream.getReader() : null;
-
-      if (reader) {
-        const decoder = new TextDecoder();
-        let buffer = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') { res.write('data: [DONE]\n\n'); continue; }
-              try {
-                const parsed = JSON.parse(data);
-                parsed.id = parsed.id || `chatcmpl-${Date.now()}`;
-                parsed.object = 'chat.completion.chunk';
-                res.write(`data: ${JSON.stringify(parsed)}\n\n`);
-              } catch (e) {
-                res.write(`data: ${data}\n\n`);
-              }
-            }
-          }
-        }
-      } else {
-        for await (const chunk of nimStream) {
-          const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString();
-          const lines = text.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) res.write(`${line}\n`);
-          }
-        }
-      }
+      const s = backend === 'gemini' ? await geminiChatStream(messages, opts) : await chatStream(messages, opts);
+      await pipeStream(s, res);
       res.end();
     } else {
-      const content = await chatComplete(messages, nimOptions);
+      const content = backend === 'gemini'
+        ? await geminiChatComplete(messages, opts)
+        : await chatComplete(messages, opts);
       res.json({
         id: `chatcmpl-${Date.now()}`, object: 'chat.completion',
-        created: Math.floor(Date.now() / 1000), model: LLM_MODEL,
+        created: Math.floor(Date.now() / 1000), model,
         choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
       });
@@ -213,10 +281,10 @@ router.post('/chat/completions', async (req, res) => {
 });
 
 // 3. OpenAI Responses API (used by AFFiNE Copilot via @ai-sdk/openai)
-//    Converts Responses format → Chat Completions → NIM → Responses format back
+//    Converts Responses format → Chat Completions → backend → Responses format back
 router.post('/responses', async (req, res) => {
   const { model: rawModel, input, instructions, stream, tools, toolChoice, temperature, max_tokens, text } = req.body;
-  const model = remapModel(rawModel);
+  const { model, backend } = resolveModel(rawModel);
   const requestId = genResponseId();
 
   console.log(`[Copilot Responses] ${requestId} model=${rawModel}→${model} stream=${!!stream} tools=${(tools||[]).length} text=${JSON.stringify(text)}`);
@@ -284,8 +352,10 @@ router.post('/responses', async (req, res) => {
       const contentPart = { type: 'output_text', text: '', annotations: [] };
       res.write(`data: ${JSON.stringify({ type: 'response.content_part.added', output_index: 0, content_index: 0, part: contentPart })}\n\n`);
 
-      // Stream from NIM
-      const nimStream = await chatStream(messages, nimOptions);
+      // Stream from backend (Gemini or NIM)
+      const nimStream = backend === 'gemini'
+        ? await geminiChatStream(messages, { ...nimOptions, model })
+        : await chatStream(messages, nimOptions);
       const reader = nimStream.getReader ? nimStream.getReader() : null;
       let fullText = '';
       let fullReasoning = '';
@@ -521,7 +591,9 @@ router.post('/responses', async (req, res) => {
 
     } else {
       // ── Non-streaming Responses API ──
-      const content = await chatComplete(messages, nimOptions);
+      const content = backend === 'gemini'
+        ? await geminiChatComplete(messages, { ...nimOptions, model })
+        : await chatComplete(messages, nimOptions);
 
       const responseObj = {
         id: requestId,
@@ -634,13 +706,16 @@ router.post('/models/:modelName\\:batchEmbedContents', async (req, res) => {
 
 // 4b. Gemini API format interceptor (used when AFFiNE uses gemini provider)
 //    Path example: /models/gemini-2.5-flash:streamGenerateContent
+//    If model is a real Gemini model AND Vertex is configured → proxy to Vertex directly
+//    Otherwise → convert to OpenAI format and call NIM
 router.post('/models/:modelName\\::action', async (req, res) => {
   const { modelName, action } = req.params;
   const isStream = action === 'streamGenerateContent';
   const { contents, systemInstruction, generationConfig, tools } = req.body;
   const requestId = genResponseId();
+  const useGeminiBackend = isGeminiModel(modelName) && !!process.env.VERTEX_PROJECT;
   
-  console.log(`[Copilot Gemini Proxy] ${requestId} model=${modelName} action=${action} stream=${isStream}`);
+  console.log(`[Copilot Gemini Proxy] ${requestId} model=${modelName} action=${action} stream=${isStream} backend=${useGeminiBackend ? 'vertex' : 'nim'}`);
   
   try {
     // Build tool list FIRST so we know whether to inject tool instructions
@@ -664,6 +739,7 @@ router.post('/models/:modelName\\::action', async (req, res) => {
     } else {
       sysText += '\n\nOutput ONLY the final user-facing content. Do NOT include reasoning, analysis, <think> tags, or conversational filler like "Okay" or "I understand".';
     }
+    sysText += '\n' + INTERACTIVE_BLOCKS_GUIDE;
     messages.push({ role: 'system', content: sysText });
     
     // Track tool_call_ids so we can pair functionCall with functionResponse
@@ -740,6 +816,50 @@ router.post('/models/:modelName\\::action', async (req, res) => {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
+
+      // If real Gemini model + Vertex configured, proxy directly in Gemini format
+      if (useGeminiBackend) {
+        const { geminiChatStream: gs } = require('./gemini');
+        // Re-import is fine (Node.js caches modules)
+        // Build the full Gemini request body and forward it
+        const { getAccessToken, GEMINI_MODEL: GM } = require('./gemini');
+        const accessToken = await getAccessToken();
+        const project = process.env.VERTEX_PROJECT;
+        const location = process.env.VERTEX_LOCATION || 'us-central1';
+        const https2 = require('https');
+        const fwdBody = JSON.stringify(req.body);
+        const endpoint = `/${location}-aiplatform.googleapis.com`;
+        const fwdReq = https2.request({
+          hostname: `${location}-aiplatform.googleapis.com`,
+          path: `/v1/projects/${project}/locations/${location}/publishers/google/models/${modelName}:streamGenerateContent?alt=sse`,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Length': Buffer.byteLength(fwdBody),
+          },
+        }, (fwdRes) => {
+          if (fwdRes.statusCode !== 200) {
+            let errData = '';
+            fwdRes.on('data', d => errData += d);
+            fwdRes.on('end', () => {
+              console.error(`[Vertex Proxy] ${requestId} HTTP ${fwdRes.statusCode}: ${errData}`);
+              if (!res.headersSent) res.status(fwdRes.statusCode).json({ error: { message: errData } });
+              else res.end();
+            });
+            return;
+          }
+          fwdRes.pipe(res);
+        });
+        fwdReq.on('error', (e) => {
+          console.error(`[Vertex Proxy] ${requestId} Error:`, e.message);
+          if (!res.headersSent) res.status(500).json({ error: { message: e.message } });
+          else res.end();
+        });
+        fwdReq.write(fwdBody);
+        fwdReq.end();
+        return;
+      }
       
       const nimStream = await chatStream(messages, nimOptions);
       const reader = nimStream.getReader ? nimStream.getReader() : null;
@@ -849,6 +969,39 @@ router.post('/models/:modelName\\::action', async (req, res) => {
       }
       res.end();
     } else {
+      // Non-streaming: use Gemini directly if applicable
+      if (useGeminiBackend) {
+        const { geminiChatComplete: gcc } = require('./gemini');
+        const { getAccessToken } = require('./gemini');
+        const accessToken = await getAccessToken();
+        const project = process.env.VERTEX_PROJECT;
+        const location = process.env.VERTEX_LOCATION || 'us-central1';
+        const https2 = require('https');
+        const fwdBody = JSON.stringify(req.body);
+        await new Promise((resolve, reject) => {
+          const fwdReq = https2.request({
+            hostname: `${location}-aiplatform.googleapis.com`,
+            path: `/v1/projects/${project}/locations/${location}/publishers/google/models/${modelName}:generateContent`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Length': Buffer.byteLength(fwdBody),
+            },
+          }, (fwdRes) => {
+            let data = '';
+            fwdRes.on('data', d => data += d);
+            fwdRes.on('end', () => {
+              res.status(fwdRes.statusCode).set('Content-Type', 'application/json').send(data);
+              resolve();
+            });
+          });
+          fwdReq.on('error', reject);
+          fwdReq.write(fwdBody);
+          fwdReq.end();
+        });
+        return;
+      }
       const content = await chatComplete(messages, nimOptions);
       res.json({
         candidates: [{

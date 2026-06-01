@@ -52,9 +52,17 @@ services:
       - AFFINE_PASSWORD=${AFFINE_PASSWORD}
       - AFFINE_WORKSPACE_ID=${AFFINE_WORKSPACE_ID}
       - CHATGPT_API_KEY=${CHATGPT_API_KEY}
+      # Google Vertex AI (ADC)
+      - VERTEX_PROJECT=${VERTEX_PROJECT}
+      - VERTEX_LOCATION=${VERTEX_LOCATION:-us-central1}
+      - GEMINI_LLM_MODEL=${GEMINI_LLM_MODEL:-gemini-2.0-flash}
+      # ADC: point to mounted gcloud credentials
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
     volumes:
       - ./chatbot:/app
       - /app/node_modules
+      # Mount host gcloud ADC credentials (run 'gcloud auth application-default login' on host)
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     command: [ "node", "--watch", "server/index.js" ]
     depends_on:
       postgres:
