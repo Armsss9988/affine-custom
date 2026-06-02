@@ -1,4 +1,3 @@
-import { ArrowRightIcon, EnterIcon } from '@blocksuite/affine/components/icons';
 import { WithDisposable } from '@blocksuite/affine/global/lit';
 import { ColorScheme } from '@blocksuite/affine/model';
 import {
@@ -6,7 +5,7 @@ import {
   PropTypes,
   requiredProperties,
 } from '@blocksuite/affine/std';
-import { css, html, LitElement, nothing } from 'lit';
+import { css, html, LitElement } from 'lit';
 import { property, query } from 'lit/decorators.js';
 
 import { menuItemStyles } from './styles';
@@ -39,14 +38,9 @@ export class AIItem extends WithDisposable(LitElement) {
       }}
     >
       <span class="item-icon">${item.icon}</span>
-      <div class="item-name">
-        ${item.name}${item.beta
-          ? html`<div class="item-beta">(Beta)</div>`
-          : nothing}
-      </div>
-      ${item.subItem
-        ? html`<span class="arrow-right-icon">${ArrowRightIcon}</span>`
-        : html`<span class="enter-icon">${EnterIcon}</span>`}
+      <affine-tooltip .offsetY=${12}>
+        ${item.name}${item.beta ? ' (Beta)' : ''}
+      </affine-tooltip>
     </div>`;
   }
 

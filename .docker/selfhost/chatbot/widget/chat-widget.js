@@ -20,6 +20,20 @@
   let unreadCount = 0;
   sessionStorage.setItem(SESSION_KEY, sessionId);
 
+  // ─── TTS State ─────────────────────────────────────────────────────────────
+  let ttsAudio = null;        // current Audio object
+  let ttsPlaying = false;
+  let ttsSpeakingEl = null;   // bot bubble element being spoken
+  const TTS_VOICES = [
+    { label: '🇻🇳 Nữ (Neural2)', value: 'vi-VN-Neural2-A', lang: 'vi-VN' },
+    { label: '🇻🇳 Nam (Neural2)', value: 'vi-VN-Neural2-D', lang: 'vi-VN' },
+    { label: '🇺🇸 Female (Journey)', value: 'en-US-Journey-F', lang: 'en-US' },
+    { label: '🇺🇸 Male (Journey)', value: 'en-US-Journey-D', lang: 'en-US' },
+  ];
+  let ttsVoice = TTS_VOICES[0];
+  let ttsRate = 1.0;
+
+
   function buildWidget() {
     const root = document.createElement('div');
     root.id = 'cb-root';
@@ -56,6 +70,7 @@
       '      <div class="cb-dot"></div><div class="cb-dot"></div><div class="cb-dot"></div>',
       '    </div>',
       '  </div>',
+      '  </div>',
       '  <div id="cb-input-area">',
       '    <div id="cb-input-row">',
       '      <textarea id="cb-input" placeholder="Hoi ve AFFiNE..." rows="1" maxlength="2000" aria-label="Nhap cau hoi"></textarea>',
@@ -65,10 +80,39 @@
       '    </div>',
       '    <div id="cb-hint">Enter de gui · Shift+Enter xuong dong</div>',
       '  </div>',
+      /* TTS mini-player (hidden by default) */
+      '  <div id="cb-tts-player" style="display:none">',
+      '    <div id="cb-tts-controls">',
+      '      <button id="cb-tts-play" title="Play / Pause" aria-label="Play Pause TTS">&#9654;</button>',
+      '      <div id="cb-tts-info">',
+      '        <span id="cb-tts-label">Dang doc...</span>',
+      '        <div id="cb-tts-progress-bar"><div id="cb-tts-progress"></div></div>',
+      '      </div>',
+      '      <select id="cb-tts-rate" title="Toc do doc" aria-label="Toc do">',
+      '        <option value="0.75">0.75x</option>',
+      '        <option value="1.0" selected>1x</option>',
+      '        <option value="1.25">1.25x</option>',
+      '        <option value="1.5">1.5x</option>',
+      '        <option value="2.0">2x</option>',
+      '      </select>',
+      '      <select id="cb-tts-voice" title="Giong doc" aria-label="Giong doc">',
+      '      </select>',
+      '      <button id="cb-tts-stop" title="Dung doc" aria-label="Stop TTS">&#9632;</button>',
+      '    </div>',
+      '  </div>',
       '</div>',
     ].join('\n');
     document.body.appendChild(root);
+    // Populate voice selector
+    var voiceSel = document.getElementById('cb-tts-voice');
+    TTS_VOICES.forEach(function(v, i) {
+      var opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = v.label;
+      voiceSel.appendChild(opt);
+    });
   }
+
 
   function init() {
     buildWidget();
@@ -87,7 +131,18 @@
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && isOpen) { togglePanel(false); }
     });
+    // TTS controls
+    document.getElementById('cb-tts-play').addEventListener('click', ttsTogglePlay);
+    document.getElementById('cb-tts-stop').addEventListener('click', ttsStop);
+    document.getElementById('cb-tts-rate').addEventListener('change', function() {
+      ttsRate = parseFloat(this.value);
+      if (ttsAudio) ttsAudio.playbackRate = ttsRate;
+    });
+    document.getElementById('cb-tts-voice').addEventListener('change', function() {
+      ttsVoice = TTS_VOICES[parseInt(this.value, 10)] || TTS_VOICES[0];
+    });
   }
+
 
   function renderSuggestions() {
     const container = document.getElementById('cb-suggestions');
@@ -235,7 +290,102 @@
     });
   }
 
+  // ─── TTS Functions ─────────────────────────────────────────────────────────
+
+  /** Speak a bot message bubble (extract plain text from HTML) */
+  function ttsSpeak(bubbleEl) {
+    var text = (bubbleEl.innerText || bubbleEl.textContent || '').trim();
+    if (!text) return;
+
+    ttsStop();
+    ttsSpeakingEl = bubbleEl;
+
+    // Show loading state
+    var player = document.getElementById('cb-tts-player');
+    var label = document.getElementById('cb-tts-label');
+    var playBtn = document.getElementById('cb-tts-play');
+    player.style.display = 'block';
+    label.textContent = 'Dang tai giong noi...';
+    playBtn.textContent = '⏳';
+
+    var body = JSON.stringify({
+      text: text,
+      voice: ttsVoice.value,
+      languageCode: ttsVoice.lang,
+      speakingRate: ttsRate,
+    });
+
+    fetch(API_BASE + '/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+    }).then(function(resp) {
+      if (!resp.ok) return resp.json().then(function(e) { throw new Error(e.error || 'TTS error'); });
+      return resp.blob();
+    }).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      ttsAudio = new Audio(url);
+      ttsAudio.playbackRate = ttsRate;
+      ttsPlaying = true;
+
+      label.textContent = ttsVoice.label;
+      playBtn.textContent = '⏸';
+
+      // Progress bar
+      ttsAudio.addEventListener('timeupdate', function() {
+        if (ttsAudio.duration) {
+          var pct = (ttsAudio.currentTime / ttsAudio.duration) * 100;
+          document.getElementById('cb-tts-progress').style.width = pct + '%';
+        }
+      });
+      ttsAudio.addEventListener('ended', function() {
+        ttsPlaying = false;
+        playBtn.textContent = '▶';
+        document.getElementById('cb-tts-progress').style.width = '100%';
+        URL.revokeObjectURL(url);
+      });
+      ttsAudio.play();
+    }).catch(function(err) {
+      label.textContent = '⚠ ' + (err.message || 'Loi TTS');
+      playBtn.textContent = '▶';
+      console.error('[TTS]', err);
+    });
+  }
+
+  function ttsTogglePlay() {
+    if (!ttsAudio) return;
+    var playBtn = document.getElementById('cb-tts-play');
+    if (ttsPlaying) {
+      ttsAudio.pause();
+      ttsPlaying = false;
+      playBtn.textContent = '▶';
+    } else {
+      ttsAudio.play();
+      ttsPlaying = true;
+      playBtn.textContent = '⏸';
+    }
+  }
+
+  function ttsStop() {
+    if (ttsAudio) {
+      ttsAudio.pause();
+      ttsAudio.src = '';
+      ttsAudio = null;
+    }
+    ttsPlaying = false;
+    ttsSpeakingEl = null;
+    var player = document.getElementById('cb-tts-player');
+    if (player) player.style.display = 'none';
+    var progress = document.getElementById('cb-tts-progress');
+    if (progress) progress.style.width = '0%';
+    var playBtn = document.getElementById('cb-tts-play');
+    if (playBtn) playBtn.textContent = '▶';
+  }
+
+  // ─── Message Helpers ────────────────────────────────────────────────────────
+
   function appendMessage(role, text) {
+
     const container = document.getElementById('cb-messages');
     const msgEl = document.createElement('div');
     msgEl.className = 'cb-msg ' + role;
@@ -264,25 +414,34 @@
   }
 
   function createBotMessageEl() {
-    const msgEl = document.createElement('div');
+    var msgEl = document.createElement('div');
     msgEl.className = 'cb-msg bot';
 
-    const avatarEl = document.createElement('div');
+    var avatarEl = document.createElement('div');
     avatarEl.className = 'cb-msg-avatar';
     avatarEl.textContent = String.fromCodePoint(0x1F916);
 
-    const contentEl = document.createElement('div');
+    var contentEl = document.createElement('div');
     contentEl.className = 'cb-msg-content';
 
-    const bubbleEl = document.createElement('div');
+    var bubbleEl = document.createElement('div');
     bubbleEl.className = 'cb-msg-bubble';
     bubbleEl.textContent = String.fromCodePoint(0x258C);
 
+    // TTS speak button
+    var ttsBtn = document.createElement('button');
+    ttsBtn.className = 'cb-tts-btn';
+    ttsBtn.title = 'Doc tin nhan nay';
+    ttsBtn.innerHTML = '&#128266;';
+    ttsBtn.addEventListener('click', function() { ttsSpeak(bubbleEl); });
+
     contentEl.appendChild(bubbleEl);
+    contentEl.appendChild(ttsBtn);
     msgEl.appendChild(avatarEl);
     msgEl.appendChild(contentEl);
     return msgEl;
   }
+
 
   function showTyping(show) {
     const el = document.getElementById('cb-typing');

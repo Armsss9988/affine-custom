@@ -7,8 +7,7 @@ import {
   requiredProperties,
 } from '@blocksuite/affine/std';
 import { flip, offset } from '@floating-ui/dom';
-import { baseTheme } from '@toeverything/theme';
-import { css, html, LitElement, nothing, unsafeCSS } from 'lit';
+import { css, html, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
@@ -21,24 +20,11 @@ export class AIItemList extends WithDisposable(LitElement) {
   static override styles = css`
     :host {
       display: flex;
-      flex-direction: column;
-      gap: 2px;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
       width: 100%;
-      font-family: ${unsafeCSS(baseTheme.fontSansFamily)};
       user-select: none;
-    }
-    .group-name {
-      display: flex;
-      padding: 4px calc(var(--item-padding, 8px) + 4px);
-      align-items: center;
-      color: var(--affine-text-secondary-color);
-      text-align: justify;
-      font-size: var(--affine-font-xs);
-      font-style: normal;
-      font-weight: 500;
-      line-height: 20px;
-      width: 100%;
-      box-sizing: border-box;
     }
   `;
 
@@ -115,11 +101,6 @@ export class AIItemList extends WithDisposable(LitElement) {
     const theme = this.host.std.get(ThemeProvider).app$.value;
     return html`${repeat(this.groups, group => {
       return html`
-        ${group.name
-          ? html`<div class="group-name">
-              ${group.name.toLocaleUpperCase()}
-            </div>`
-          : nothing}
         ${repeat(
           group.items,
           item => item.name,

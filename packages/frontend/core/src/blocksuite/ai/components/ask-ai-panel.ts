@@ -3,7 +3,6 @@ import {
   DocModeProvider,
   ThemeProvider,
 } from '@blocksuite/affine/shared/services';
-import { scrollbarStyle } from '@blocksuite/affine/shared/styles';
 import { type EditorHost } from '@blocksuite/affine/std';
 import { cssVar } from '@toeverything/theme';
 import { css, html, LitElement, unsafeCSS } from 'lit';
@@ -20,19 +19,11 @@ export class AskAIPanel extends WithDisposable(LitElement) {
 
     .ask-ai-panel {
       box-sizing: border-box;
-      padding: 8px 4px 8px 8px;
-      max-height: 374px;
-      overflow-y: auto;
+      padding: 8px;
       background: var(--affine-background-overlay-panel-color);
       box-shadow: ${unsafeCSS(cssVar('overlayPanelShadow'))};
       border-radius: 8px;
       z-index: var(--affine-z-index-popover);
-      scrollbar-gutter: stable;
-    }
-
-    ${scrollbarStyle('.ask-ai-panel')}
-    .ask-ai-panel:hover::-webkit-scrollbar-thumb {
-      background-color: var(--affine-black-30);
     }
   `;
 

@@ -147,15 +147,20 @@ async function listVoices(languageCode) {
   const token = await getAccessToken();
   const query = languageCode ? `?languageCode=${encodeURIComponent(languageCode)}` : '';
 
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+  if (VERTEX_PROJECT) {
+    headers['x-goog-user-project'] = VERTEX_PROJECT;
+  }
+
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: 'texttospeech.googleapis.com',
       path: `/v1/voices${query}`,
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
     }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
@@ -175,5 +180,6 @@ async function listVoices(languageCode) {
     req.end();
   });
 }
+
 
 module.exports = { synthesizeSpeech, listVoices, SUPPORTED_VOICES, DEFAULT_VOICE };
