@@ -6,6 +6,7 @@ const { embedText, chatStream } = require('./nim');
 const { searchSimilar, buildPrompt } = require('./rag');
 const { getOrCreateConversation, saveMessage, getHistory } = require('./history');
 const { ingestAll, ingestFile } = require('./ingest');
+const { synthesizeSpeech, listVoices } = require('./tts');
 
 const app = express();
 const PORT = process.env.CHATBOT_PORT || 3099;
@@ -33,6 +34,47 @@ app.use('/v1beta', copilotRouter);
 // REST API endpoints for ChatGPT Integration (Documents, Folders, Collections, etc. under /api)
 const docsRouter = require('./docs');
 app.use('/api', docsRouter);
+
+// ─── TTS: Text-to-Speech (Google Cloud TTS via ADC) ────────────────────────
+// POST /api/tts  { text, voice?, languageCode?, speakingRate?, pitch? }
+// Returns: audio/mpeg binary
+app.post('/api/tts', async (req, res) => {
+  const { text, voice, languageCode, speakingRate, pitch } = req.body;
+
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: '"text" field is required and must be a non-empty string' });
+  }
+
+  try {
+    const audioBuffer = await synthesizeSpeech(text.trim(), {
+      voice,
+      languageCode: languageCode || 'vi-VN',
+      speakingRate: speakingRate ? parseFloat(speakingRate) : 1.0,
+      pitch: pitch ? parseFloat(pitch) : 0.0,
+      audioEncoding: 'MP3',
+    });
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', audioBuffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(audioBuffer);
+  } catch (err) {
+    console.error('[TTS] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/tts/voices?lang=vi-VN  — List available voices
+app.get('/api/tts/voices', async (req, res) => {
+  const lang = req.query.lang || req.query.languageCode || '';
+  try {
+    const voices = await listVoices(lang);
+    res.json({ voices });
+  } catch (err) {
+    console.error('[TTS] listVoices error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Chat endpoint (streaming via SSE)
 app.post('/api/chat', async (req, res) => {
