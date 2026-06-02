@@ -33,7 +33,6 @@ app.use('/v1beta', copilotRouter);
 
 // REST API endpoints for ChatGPT Integration (Documents, Folders, Collections, etc. under /api)
 const docsRouter = require('./docs');
-app.use('/api', docsRouter);
 
 // ─── TTS: Text-to-Speech (Google Cloud TTS via ADC) ────────────────────────
 // POST /api/tts  { text, voice?, languageCode?, speakingRate?, pitch? }
@@ -245,6 +244,9 @@ app.delete('/api/history/:sessionId', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// REST API endpoints for ChatGPT Integration (Documents, Folders, Collections, etc. under /api)
+app.use('/api', docsRouter);
 
 // Start server
 async function start() {
