@@ -275,6 +275,35 @@ function createCopyAsMarkdownMenuItem(
   };
 }
 
+function collectTextsFromModelsWithDescendants(models: any[]): string {
+  const texts: string[] = [];
+  const visited = new Set<string>();
+
+  function traverse(model: any) {
+    if (!model || visited.has(model.id)) return;
+    visited.add(model.id);
+
+    if (model.text && typeof model.text.toString === 'function') {
+      const txt = model.text.toString().trim();
+      if (txt) {
+        texts.push(txt);
+      }
+    }
+
+    if (model.children && Array.isArray(model.children)) {
+      for (const child of model.children) {
+        traverse(child);
+      }
+    }
+  }
+
+  for (const model of models) {
+    traverse(model);
+  }
+
+  return texts.join('\n\n');
+}
+
 function createSpeakBlockMenuItem(
   _framework: FrameworkProvider,
   item = {
@@ -290,16 +319,7 @@ function createSpeakBlockMenuItem(
     ...item,
     action: (ctx: MenuContext) => {
       void (async () => {
-        const texts: string[] = [];
-        for (const model of ctx.selectedBlockModels) {
-          if (model.text && typeof model.text.toString === 'function') {
-            const txt = model.text.toString().trim();
-            if (txt) {
-              texts.push(txt);
-            }
-          }
-        }
-        const textToRead = texts.join('\n\n');
+        const textToRead = collectTextsFromModelsWithDescendants(ctx.selectedBlockModels);
         if (textToRead && typeof (window as any).readTextWithTTS === 'function') {
           (window as any).readTextWithTTS(textToRead);
         } else {
@@ -470,17 +490,10 @@ function createToolbarMoreMenuConfigV2(baseUrl?: string) {
                 if (selectionText) {
                   textToRead = selectionText;
                 } else {
-                  // 2. Fallback to selected block models
+                  // 2. Fallback to selected block models (and their descendants)
                   const [ok, ctx] = std.command.exec(getSelectedModelsCommand);
                   if (ok && ctx.selectedModels) {
-                    const texts: string[] = [];
-                    for (const model of ctx.selectedModels) {
-                      if (model.text && typeof model.text.toString === 'function') {
-                        const txt = model.text.toString().trim();
-                        if (txt) texts.push(txt);
-                      }
-                    }
-                    textToRead = texts.join('\n\n');
+                    textToRead = collectTextsFromModelsWithDescendants(ctx.selectedModels);
                   }
                 }
 
