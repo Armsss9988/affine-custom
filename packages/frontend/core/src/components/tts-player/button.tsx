@@ -16,10 +16,10 @@ export const TTSButton = ({ page }: TTSButtonProps) => {
     const title = pageObj.meta?.title || '';
     if (title) texts.push(title);
 
-    if (pageObj && pageObj.blocks) {
-      for (const block of pageObj.blocks.values()) {
-        if (block.text && typeof block.text.toString === 'function') {
-          const txt = block.text.toString().trim();
+    if (pageObj && typeof pageObj.getAllModels === 'function') {
+      for (const model of pageObj.getAllModels()) {
+        if (model.text && typeof model.text.toString === 'function') {
+          const txt = model.text.toString().trim();
           if (txt) {
             texts.push(txt);
           }
