@@ -1,13 +1,14 @@
 import { createLitPortal } from '@blocksuite/affine/components/portal';
 import { WithDisposable } from '@blocksuite/affine/global/lit';
-import { ThemeProvider } from '@blocksuite/affine/shared/services';
+import { ColorScheme } from '@blocksuite/affine/model';
 import {
   EditorHost,
   PropTypes,
   requiredProperties,
 } from '@blocksuite/affine/std';
 import { flip, offset } from '@floating-ui/dom';
-import { css, html, LitElement } from 'lit';
+import { baseTheme } from '@toeverything/theme';
+import { css, html, LitElement, nothing, unsafeCSS } from 'lit';
 import { property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
@@ -20,11 +21,24 @@ export class AIItemList extends WithDisposable(LitElement) {
   static override styles = css`
     :host {
       display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-direction: column;
+      gap: 2px;
       width: 100%;
+      font-family: ${unsafeCSS(baseTheme.fontSansFamily)};
       user-select: none;
+    }
+    .group-name {
+      display: flex;
+      padding: 4px calc(var(--item-padding, 8px) + 4px);
+      align-items: center;
+      color: var(--affine-text-secondary-color);
+      text-align: justify;
+      font-size: var(--affine-font-xs);
+      font-style: normal;
+      font-weight: 500;
+      line-height: 20px;
+      width: 100%;
+      box-sizing: border-box;
     }
   `;
 
@@ -98,15 +112,19 @@ export class AIItemList extends WithDisposable(LitElement) {
   }
 
   override render() {
-    const theme = this.host.std.get(ThemeProvider).app$.value;
     return html`${repeat(this.groups, group => {
       return html`
+        ${group.name
+          ? html`<div class="group-name">
+              ${group.name.toLocaleUpperCase()}
+            </div>`
+          : nothing}
         ${repeat(
           group.items,
           item => item.name,
           item =>
             html`<ai-item
-              .theme=${theme}
+              .theme=${this.theme}
               .onClick=${this.onClick}
               .item=${item}
               .host=${this.host}
@@ -129,6 +147,9 @@ export class AIItemList extends WithDisposable(LitElement) {
 
   @property({ attribute: 'data-testid', reflect: true })
   accessor testId = 'ai-item-list';
+
+  @property({ attribute: false })
+  accessor theme: ColorScheme = ColorScheme.Light;
 }
 
 declare global {

@@ -3,6 +3,7 @@ import {
   DocModeProvider,
   ThemeProvider,
 } from '@blocksuite/affine/shared/services';
+import { scrollbarStyle } from '@blocksuite/affine/shared/styles';
 import { type EditorHost } from '@blocksuite/affine/std';
 import { cssVar } from '@toeverything/theme';
 import { css, html, LitElement, unsafeCSS } from 'lit';
@@ -19,11 +20,19 @@ export class AskAIPanel extends WithDisposable(LitElement) {
 
     .ask-ai-panel {
       box-sizing: border-box;
-      padding: 8px;
+      padding: 8px 4px 8px 8px;
+      max-height: 374px;
+      overflow-y: auto;
       background: var(--affine-background-overlay-panel-color);
       box-shadow: ${unsafeCSS(cssVar('overlayPanelShadow'))};
       border-radius: 8px;
       z-index: var(--affine-z-index-popover);
+      scrollbar-gutter: stable;
+    }
+
+    ${scrollbarStyle('.ask-ai-panel')}
+    .ask-ai-panel:hover::-webkit-scrollbar-thumb {
+      background-color: var(--affine-black-30);
     }
   `;
 
@@ -77,8 +86,10 @@ export class AskAIPanel extends WithDisposable(LitElement) {
     const style = styleMap({
       minWidth: `${this.minWidth}px`,
     });
+    const appTheme = this.host.std.get(ThemeProvider).app$.value;
     return html`<div class="ask-ai-panel" style=${style}>
       <ai-item-list
+        .theme=${appTheme}
         .host=${this.host}
         .groups=${this._actionGroups}
         .onClick=${this.onItemClick}
