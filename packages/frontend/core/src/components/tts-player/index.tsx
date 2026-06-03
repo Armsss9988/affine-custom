@@ -36,6 +36,21 @@ export function TTSPlayer() {
       });
   }, []);
 
+  // Register global callback for BlockSuite integration
+  useEffect(() => {
+    (window as any).readTextWithTTS = (text: string) => {
+      ttsController.synthesizeAndPlay(
+        text,
+        state.voice,
+        state.rate,
+        setState
+      );
+    };
+    return () => {
+      delete (window as any).readTextWithTTS;
+    };
+  }, [state.voice, state.rate, setState]);
+
   // Clean up audio on unmount
   useEffect(() => {
     return () => {

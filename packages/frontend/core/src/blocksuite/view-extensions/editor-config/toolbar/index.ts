@@ -131,6 +131,12 @@ export function createToolbarMoreMenuConfig(framework: FrameworkProvider) {
           0,
           createCopyAsMarkdownMenuItem(framework)
         );
+
+        clipboardGroup.items.splice(
+          copyIndex + 1,
+          0,
+          createSpeakBlockMenuItem(framework)
+        );
       }
 
       return groups;
@@ -259,6 +265,45 @@ function createCopyAsMarkdownMenuItem(
             await navigator.clipboard.writeText(markdown);
             toast(std.host, I18n['com.affine.export.copied-as-markdown']());
           }
+        }
+      })()
+        .catch(console.error)
+        .finally(() => {
+          ctx.close();
+        });
+    },
+  };
+}
+
+function createSpeakBlockMenuItem(
+  _framework: FrameworkProvider,
+  item = {
+    icon: html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>`,
+    label: 'Đọc văn bản block (TTS)',
+    type: 'read-with-tts',
+    when: (ctx: MenuContext) => {
+      return !ctx.isEmpty();
+    },
+  }
+) {
+  return {
+    ...item,
+    action: (ctx: MenuContext) => {
+      void (async () => {
+        const texts: string[] = [];
+        for (const model of ctx.selectedBlockModels) {
+          if (model.text && typeof model.text.toString === 'function') {
+            const txt = model.text.toString().trim();
+            if (txt) {
+              texts.push(txt);
+            }
+          }
+        }
+        const textToRead = texts.join('\n\n');
+        if (textToRead && typeof (window as any).readTextWithTTS === 'function') {
+          (window as any).readTextWithTTS(textToRead);
+        } else {
+          alert('Không có văn bản hoặc chưa khởi tạo TTS Player.');
         }
       })()
         .catch(console.error)
@@ -409,6 +454,42 @@ function createToolbarMoreMenuConfigV2(baseUrl?: string) {
                 .catch(console.error);
 
               track.doc.editor.toolbar.copyBlockToLink({ type });
+            },
+          },
+          {
+            id: 'read-with-tts',
+            label: 'Đọc văn bản (TTS)',
+            icon: html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>`,
+            when: ({ flags }) => !flags.isHovering(),
+            run: ({ std }) => {
+              void (async () => {
+                let textToRead = '';
+                
+                // 1. Try browser text selection first
+                const selectionText = window.getSelection()?.toString().trim();
+                if (selectionText) {
+                  textToRead = selectionText;
+                } else {
+                  // 2. Fallback to selected block models
+                  const [ok, ctx] = std.command.exec(getSelectedModelsCommand);
+                  if (ok && ctx.selectedModels) {
+                    const texts: string[] = [];
+                    for (const model of ctx.selectedModels) {
+                      if (model.text && typeof model.text.toString === 'function') {
+                        const txt = model.text.toString().trim();
+                        if (txt) texts.push(txt);
+                      }
+                    }
+                    textToRead = texts.join('\n\n');
+                  }
+                }
+
+                if (textToRead && typeof (window as any).readTextWithTTS === 'function') {
+                  (window as any).readTextWithTTS(textToRead);
+                } else {
+                  alert("Không có văn bản hoặc chưa khởi tạo TTS Player.");
+                }
+              })().catch(console.error);
             },
           },
         ],
