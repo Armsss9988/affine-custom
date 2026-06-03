@@ -28,6 +28,8 @@ import { useI18n } from '@affine/i18n';
 import { track } from '@affine/track';
 import type { Store } from '@blocksuite/affine/store';
 import { useLiveData, useService } from '@toeverything/infra';
+import { TTSButton } from '@affine/core/components/tts-player/button';
+
 import clsx from 'clsx';
 import {
   forwardRef,
@@ -118,6 +120,7 @@ export function JournalPageHeader({ page, workspace }: PageHeaderProps) {
       {page && !hideShare ? (
         <SharePageButton workspace={workspace} page={page} />
       ) : null}
+      <TTSButton page={page} />
     </Header>
   );
 }
@@ -175,6 +178,7 @@ export function NormalPageHeader({ page, workspace }: PageHeaderProps) {
       <div className={styles.spacer} />
 
       {!hidePresent ? <DetailPageHeaderPresentButton /> : null}
+      <TTSButton page={page} />
 
       {page && !hideShare ? (
         <SharePageButton workspace={workspace} page={page} />

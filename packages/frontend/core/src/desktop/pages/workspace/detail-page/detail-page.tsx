@@ -64,7 +64,9 @@ import { useParams } from 'react-router-dom';
 import type { Subscription } from 'rxjs';
 
 import { PageNotFound } from '../../404';
+import { TTSPlayer } from '@affine/core/components/tts-player';
 import * as styles from './detail-page.css';
+
 import { DetailPageHeader } from './detail-page-header';
 import { DetailPageWrapper } from './detail-page-wrapper';
 import { EditorAdapterPanel } from './tabs/adapter';
@@ -369,6 +371,7 @@ const DetailPageImpl = memo(function DetailPageImpl() {
             />
           </AffineErrorBoundary>
           {isInTrash ? <TrashPageFooter /> : null}
+          <TTSPlayer />
         </div>
       </ViewBody>
 

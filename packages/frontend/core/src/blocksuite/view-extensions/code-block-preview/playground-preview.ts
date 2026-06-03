@@ -869,6 +869,94 @@ export class PlaygroundPreview extends SignalWatcher(
     }
   }
 
+  private _openInStackBlitz() {
+    const code = this._editorInstance
+      ? this._editorInstance.getValue()
+      : (this.model?.props.text.toString() ?? '');
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'https://stackblitz.com/run';
+    form.target = '_blank';
+
+    const addInput = (name: string, value: string) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+
+    addInput('project[title]', `AFFiNE Code Preview (${this.lang})`);
+    addInput('project[description]', 'Auto-generated sandbox from AFFiNE');
+
+    const lowercaseLang = this.lang.toLowerCase();
+    const hasNodeImports = code.includes('express') || 
+                           code.includes('require(') || 
+                           code.includes('import ') ||
+                           code.includes('app.listen');
+
+    if (lowercaseLang === 'javascript' || lowercaseLang === 'typescript') {
+      if (hasNodeImports) {
+        addInput('project[template]', 'node');
+        addInput('project[files][index.js]', code);
+        
+        const dependencies: Record<string, string> = {};
+        const importRegex = /import\s+.*?\s+from\s+['"]([^'"]+)['"]/g;
+        const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+        let match;
+        
+        while ((match = importRegex.exec(code)) !== null) {
+          const pkg = match[1];
+          if (!pkg.startsWith('.') && !pkg.startsWith('/')) {
+            dependencies[pkg] = 'latest';
+          }
+        }
+        while ((match = requireRegex.exec(code)) !== null) {
+          const pkg = match[1];
+          if (!pkg.startsWith('.') && !pkg.startsWith('/')) {
+            dependencies[pkg] = 'latest';
+          }
+        }
+        
+        if (code.includes('express') && !dependencies['express']) {
+          dependencies['express'] = 'latest';
+        }
+
+        const packageJson = {
+          name: 'affine-playground-node',
+          version: '1.0.0',
+          main: 'index.js',
+          dependencies: dependencies,
+          scripts: {
+            start: 'node index.js'
+          }
+        };
+        addInput('project[files][package.json]', JSON.stringify(packageJson, null, 2));
+      } else {
+        addInput('project[template]', lowercaseLang);
+        addInput(`project[files][index.${lowercaseLang === 'typescript' ? 'ts' : 'js'}]`, code);
+        addInput('project[files][index.html]', `<div id="app"></div>\n<script src="index.${lowercaseLang === 'typescript' ? 'ts' : 'js'}"></script>`);
+      }
+    } else if (lowercaseLang === 'html' || lowercaseLang === 'css') {
+      addInput('project[template]', 'javascript');
+      addInput('project[files][index.html]', lowercaseLang === 'html' ? code : `<html>\n<head>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<h1>AFFiNE Code Sandbox</h1>\n</body>\n</html>`);
+      addInput('project[files][style.css]', lowercaseLang === 'css' ? code : 'body { font-family: sans-serif; }');
+      addInput('project[files][index.js]', '// Entry point');
+    } else {
+      addInput('project[template]', 'javascript');
+      addInput('project[files][index.js]', code);
+      addInput('project[files][index.html]', '<h1>AFFiNE Sandbox</h1>\n<script src="index.js"></script>');
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+    
+    setTimeout(() => {
+      form.remove();
+    }, 500);
+  }
+
   private async _runCode() {
     if (this.executionState === 'running') return;
 
@@ -1053,6 +1141,12 @@ export class PlaygroundPreview extends SignalWatcher(
       </svg>
     `;
 
+    const stackblitzIcon = () => html`
+      <svg viewBox="0 0 24 24" style="fill: #1389FD;">
+        <path d="M19 9h-6l3-7L5 15h6l-3 7z" />
+      </svg>
+    `;
+
     const trashIcon = () => html`
       <svg viewBox="0 0 24 24">
         <path
@@ -1096,6 +1190,18 @@ export class PlaygroundPreview extends SignalWatcher(
               ${this.executionState === 'running' ? stopIcon() : playIcon()}
               <span>Run</span>
             </button>
+            ${['javascript', 'typescript', 'html', 'css'].includes(this.lang?.toLowerCase())
+              ? html`
+                  <button
+                    class="action-button"
+                    @click=${this._openInStackBlitz}
+                    title="Open in StackBlitz Sandbox"
+                  >
+                    ${stackblitzIcon()}
+                    <span>StackBlitz</span>
+                  </button>
+                `
+              : nothing}
             <button
               class="action-button"
               @click=${this._clearConsole}
