@@ -128,6 +128,7 @@ export class DocComposeTool extends ArtifactTool<
               customHeading: true,
               extensions: getCustomPageEditorBlockSpecs(),
               theme: this.theme,
+              scrollable: false,
             }}
           ></text-renderer>`
         : html``}
