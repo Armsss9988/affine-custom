@@ -24,14 +24,20 @@ export class PromptService {
 
   async get(name: string): Promise<ResolvedPrompt | null> {
     const compatPrompt = await this.lookupCompatPrompt(name);
+    const builtInPromptSpec = this.lookupBuiltInPromptSpec(name);
+
+    if (builtInPromptSpec) {
+      if (compatPrompt && compatPrompt.modified) {
+        return this.describeCompatPrompt(this.clonePrompt(compatPrompt));
+      }
+      return this.describeBuiltInPromptSpec(builtInPromptSpec);
+    }
+
     if (compatPrompt) {
       return this.describeCompatPrompt(this.clonePrompt(compatPrompt));
     }
 
-    const builtInPromptSpec = this.lookupBuiltInPromptSpec(name);
-    if (!builtInPromptSpec) return null;
-
-    return this.describeBuiltInPromptSpec(builtInPromptSpec);
+    return null;
   }
 
   finish(
@@ -100,6 +106,7 @@ export class PromptService {
       optionalModels: prompt.optionalModels,
       action: prompt.action ?? undefined,
       config: (prompt.config as any) ?? undefined,
+      modified: prompt.modified,
       messages: prompt.messages.map(msg => ({
         role: msg.role.toLowerCase() as any,
         content: msg.content ?? '',

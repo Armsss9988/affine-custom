@@ -11,6 +11,7 @@ export type Prompt = {
   action?: string;
   messages: PromptMessage[];
   config?: PromptConfig;
+  modified?: boolean;
 };
 
 export type ResolvedPrompt = {
