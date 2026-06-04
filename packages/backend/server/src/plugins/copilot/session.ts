@@ -368,11 +368,13 @@ export class ChatSessionService {
     }
     finalData.pinned = options.pinned;
     finalData.docId = options.docId;
+    finalData.title = options.title;
 
     if (
       options.promptName === undefined &&
       options.pinned === undefined &&
-      options.docId === undefined
+      options.docId === undefined &&
+      options.title === undefined
     ) {
       throw new CopilotSessionInvalidInput(
         'No valid fields to update in the session'
