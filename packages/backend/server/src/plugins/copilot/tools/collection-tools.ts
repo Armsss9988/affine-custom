@@ -4,6 +4,7 @@ import * as Y from 'yjs';
 import { z } from 'zod';
 
 import { PgWorkspaceDocStorageAdapter } from '../../../core/doc/adapters/workspace';
+import { DocWriter } from '../../../core/doc/writer';
 import { AccessController } from '../../../core/permission';
 import { Models } from '../../../models';
 import { toolError } from './error';
@@ -61,14 +62,12 @@ function buildCollectionUpdate(
   const collectionsArray = collections as Y.Array<any>;
   doc.transact(() => {
     if (action === 'create') {
-      const colMap = new Y.Map();
-      colMap.set('id', info.id);
-      colMap.set('name', info.name || '');
-      colMap.set('allowList', new Y.Array());
-      const rulesMap = new Y.Map();
-      rulesMap.set('filters', new Y.Array());
-      colMap.set('rules', rulesMap);
-      collectionsArray.push([colMap]);
+      collectionsArray.push([{
+        id: info.id,
+        name: info.name || '',
+        allowList: [],
+        rules: { filters: [] }
+      }]);
     } else if (action === 'delete') {
       for (let i = 0; i < collectionsArray.length; i++) {
         const col = collectionsArray.get(i);
@@ -83,13 +82,16 @@ function buildCollectionUpdate(
         const col = collectionsArray.get(i);
         const colId = typeof col.get === 'function' ? col.get('id') : col.id;
         if (colId === info.id) {
-          if (typeof col.set === 'function') {
-            const yAllow = new Y.Array();
-            yAllow.push(info.allowList || []);
-            col.set('allowList', yAllow);
-          } else {
-            col.allowList = info.allowList || [];
-          }
+          const colName = typeof col.get === 'function' ? col.get('name') : col.name;
+          const colRules = typeof col.get === 'function' ? (typeof col.get('rules')?.toJSON === 'function' ? col.get('rules').toJSON() : col.get('rules')) : col.rules;
+
+          collectionsArray.delete(i, 1);
+          collectionsArray.insert(i, [{
+            id: info.id,
+            name: colName || '',
+            allowList: info.allowList || [],
+            rules: colRules || { filters: [] }
+          }]);
           break;
         }
       }
@@ -147,7 +149,8 @@ export const buildCollectionListHandler = (
 export const buildCollectionCreateHandler = (
   ac: AccessController,
   storage: PgWorkspaceDocStorageAdapter,
-  _models: Models
+  _models: Models,
+  writer?: DocWriter
 ) => {
   return async (options: CopilotChatOptions, name: string) => {
     if (!options?.user || !options.workspace) {
@@ -200,12 +203,22 @@ export const buildCollectionCreateHandler = (
       { id: collectionId, name },
       'create'
     );
-    await storage.pushDocUpdates(
+    const timestamp = await storage.pushDocUpdates(
       options.workspace,
       options.workspace,
       [update],
       options.user
     );
+
+    if (writer) {
+      writer['emitDocUpdatesPushed']({
+        spaceId: options.workspace,
+        docId: options.workspace,
+        updates: [update],
+        timestamp,
+        editor: options.user,
+      });
+    }
 
     return {
       success: true,
@@ -218,7 +231,8 @@ export const buildCollectionCreateHandler = (
 export const buildCollectionAddDocHandler = (
   ac: AccessController,
   storage: PgWorkspaceDocStorageAdapter,
-  _models: Models
+  _models: Models,
+  writer?: DocWriter
 ) => {
   return async (
     options: CopilotChatOptions,
@@ -277,12 +291,22 @@ export const buildCollectionAddDocHandler = (
       { id: collectionId, allowList: newAllowList },
       'update_allow_list'
     );
-    await storage.pushDocUpdates(
+    const timestamp = await storage.pushDocUpdates(
       options.workspace,
       options.workspace,
       [update],
       options.user
     );
+
+    if (writer) {
+      writer['emitDocUpdatesPushed']({
+        spaceId: options.workspace,
+        docId: options.workspace,
+        updates: [update],
+        timestamp,
+        editor: options.user,
+      });
+    }
 
     return {
       success: true,
@@ -294,7 +318,8 @@ export const buildCollectionAddDocHandler = (
 export const buildCollectionRemoveDocHandler = (
   ac: AccessController,
   storage: PgWorkspaceDocStorageAdapter,
-  _models: Models
+  _models: Models,
+  writer?: DocWriter
 ) => {
   return async (
     options: CopilotChatOptions,
@@ -352,12 +377,22 @@ export const buildCollectionRemoveDocHandler = (
       { id: collectionId, allowList: newAllowList },
       'update_allow_list'
     );
-    await storage.pushDocUpdates(
+    const timestamp = await storage.pushDocUpdates(
       options.workspace,
       options.workspace,
       [update],
       options.user
     );
+
+    if (writer) {
+      writer['emitDocUpdatesPushed']({
+        spaceId: options.workspace,
+        docId: options.workspace,
+        updates: [update],
+        timestamp,
+        editor: options.user,
+      });
+    }
 
     return {
       success: true,

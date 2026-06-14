@@ -555,7 +555,8 @@ export class ToolRuntime {
           const createCollection = buildCollectionCreateHandler(
             this.ac,
             this.storage,
-            this.models
+            this.models,
+            this.docWriter
           );
           tools.collection_create = createCollectionCreateTool(
             createCollection.bind(null, options)
@@ -566,7 +567,8 @@ export class ToolRuntime {
           const addDoc = buildCollectionAddDocHandler(
             this.ac,
             this.storage,
-            this.models
+            this.models,
+            this.docWriter
           );
           tools.collection_add_doc = createCollectionAddDocTool(
             addDoc.bind(null, options)
@@ -577,7 +579,8 @@ export class ToolRuntime {
           const removeDoc = buildCollectionRemoveDocHandler(
             this.ac,
             this.storage,
-            this.models
+            this.models,
+            this.docWriter
           );
           tools.collection_remove_doc = createCollectionRemoveDocTool(
             removeDoc.bind(null, options)
@@ -599,7 +602,8 @@ export class ToolRuntime {
           const createFolder = buildFolderCreateHandler(
             this.ac,
             this.storage,
-            this.models
+            this.models,
+            this.docWriter
           );
           tools.folder_create = createFolderCreateTool(
             createFolder.bind(null, options)
@@ -610,7 +614,8 @@ export class ToolRuntime {
           const addDoc = buildFolderAddDocHandler(
             this.ac,
             this.storage,
-            this.models
+            this.models,
+            this.docWriter
           );
           tools.folder_add_doc = createFolderAddDocTool(
             addDoc.bind(null, options)
@@ -621,7 +626,8 @@ export class ToolRuntime {
           const removeDoc = buildFolderRemoveDocHandler(
             this.ac,
             this.storage,
-            this.models
+            this.models,
+            this.docWriter
           );
           tools.folder_remove_doc = createFolderRemoveDocTool(
             removeDoc.bind(null, options)

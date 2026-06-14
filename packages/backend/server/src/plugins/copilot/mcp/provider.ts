@@ -168,14 +168,12 @@ function buildCollectionUpdate(
   const collectionsArray = collections as Y.Array<any>;
   doc.transact(() => {
     if (action === 'create') {
-      const colMap = new Y.Map();
-      colMap.set('id', info.id);
-      colMap.set('name', info.name || '');
-      colMap.set('allowList', new Y.Array());
-      const rulesMap = new Y.Map();
-      rulesMap.set('filters', new Y.Array());
-      colMap.set('rules', rulesMap);
-      collectionsArray.push([colMap]);
+      collectionsArray.push([{
+        id: info.id,
+        name: info.name || '',
+        allowList: [],
+        rules: { filters: [] }
+      }]);
     } else if (action === 'delete') {
       for (let i = 0; i < collectionsArray.length; i++) {
         const col = collectionsArray.get(i);
@@ -190,13 +188,16 @@ function buildCollectionUpdate(
         const col = collectionsArray.get(i);
         const colId = typeof col.get === 'function' ? col.get('id') : col.id;
         if (colId === info.id) {
-          if (typeof col.set === 'function') {
-            const yAllow = new Y.Array();
-            yAllow.push(info.allowList || []);
-            col.set('allowList', yAllow);
-          } else {
-            col.allowList = info.allowList || [];
-          }
+          const colName = typeof col.get === 'function' ? col.get('name') : col.name;
+          const colRules = typeof col.get === 'function' ? (typeof col.get('rules')?.toJSON === 'function' ? col.get('rules').toJSON() : col.get('rules')) : col.rules;
+
+          collectionsArray.delete(i, 1);
+          collectionsArray.insert(i, [{
+            id: info.id,
+            name: colName || '',
+            allowList: info.allowList || [],
+            rules: colRules || { filters: [] }
+          }]);
           break;
         }
       }
@@ -1396,12 +1397,20 @@ export class WorkspaceMcpProvider {
             { id: collectionId, name },
             'create'
           );
-          await this.workspaceStorage.pushDocUpdates(
+          const timestamp = await this.workspaceStorage.pushDocUpdates(
             workspaceId,
             workspaceId,
             [update],
             userId
           );
+
+          this.writer['emitDocUpdatesPushed']({
+            spaceId: workspaceId,
+            docId: workspaceId,
+            updates: [update],
+            timestamp,
+            editor: userId,
+          });
 
           return toolText(
             JSON.stringify(
@@ -1486,12 +1495,20 @@ export class WorkspaceMcpProvider {
             { id: collectionId, allowList: newAllowList },
             'update_allow_list'
           );
-          await this.workspaceStorage.pushDocUpdates(
+          const timestamp = await this.workspaceStorage.pushDocUpdates(
             workspaceId,
             workspaceId,
             [update],
             userId
           );
+
+          this.writer['emitDocUpdatesPushed']({
+            spaceId: workspaceId,
+            docId: workspaceId,
+            updates: [update],
+            timestamp,
+            editor: userId,
+          });
 
           return toolText(
             JSON.stringify({
@@ -1569,12 +1586,20 @@ export class WorkspaceMcpProvider {
             { id: collectionId, allowList: newAllowList },
             'update_allow_list'
           );
-          await this.workspaceStorage.pushDocUpdates(
+          const timestamp = await this.workspaceStorage.pushDocUpdates(
             workspaceId,
             workspaceId,
             [update],
             userId
           );
+
+          this.writer['emitDocUpdatesPushed']({
+            spaceId: workspaceId,
+            docId: workspaceId,
+            updates: [update],
+            timestamp,
+            editor: userId,
+          });
 
           return toolText(
             JSON.stringify({
@@ -1702,12 +1727,20 @@ export class WorkspaceMcpProvider {
             index,
           });
 
-          await this.workspaceStorage.pushDocUpdates(
+          const timestamp = await this.workspaceStorage.pushDocUpdates(
             workspaceId,
             folderDocId,
             [update],
             userId
           );
+
+          this.writer['emitDocUpdatesPushed']({
+            spaceId: workspaceId,
+            docId: folderDocId,
+            updates: [update],
+            timestamp,
+            editor: userId,
+          });
 
           return toolText(
             JSON.stringify(
@@ -1790,12 +1823,20 @@ export class WorkspaceMcpProvider {
             index,
           });
 
-          await this.workspaceStorage.pushDocUpdates(
+          const timestamp = await this.workspaceStorage.pushDocUpdates(
             workspaceId,
             folderDocId,
             [update],
             userId
           );
+
+          this.writer['emitDocUpdatesPushed']({
+            spaceId: workspaceId,
+            docId: folderDocId,
+            updates: [update],
+            timestamp,
+            editor: userId,
+          });
 
           return toolText(
             JSON.stringify({
@@ -1871,12 +1912,20 @@ export class WorkspaceMcpProvider {
           }
 
           const update = buildFolderUpdate(existingBin, { id: link.id }, true);
-          await this.workspaceStorage.pushDocUpdates(
+          const timestamp = await this.workspaceStorage.pushDocUpdates(
             workspaceId,
             folderDocId,
             [update],
             userId
           );
+
+          this.writer['emitDocUpdatesPushed']({
+            spaceId: workspaceId,
+            docId: folderDocId,
+            updates: [update],
+            timestamp,
+            editor: userId,
+          });
 
           return toolText(
             JSON.stringify({

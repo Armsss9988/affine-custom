@@ -4,6 +4,7 @@ import * as Y from 'yjs';
 import { z } from 'zod';
 
 import { PgWorkspaceDocStorageAdapter } from '../../../core/doc/adapters/workspace';
+import { DocWriter } from '../../../core/doc/writer';
 import { AccessController } from '../../../core/permission';
 import { Models } from '../../../models';
 import { toolError } from './error';
@@ -192,7 +193,8 @@ export const buildFolderListHandler = (
 export const buildFolderCreateHandler = (
   ac: AccessController,
   storage: PgWorkspaceDocStorageAdapter,
-  _models: Models
+  _models: Models,
+  writer?: DocWriter
 ) => {
   return async (
     options: CopilotChatOptions,
@@ -249,12 +251,22 @@ export const buildFolderCreateHandler = (
       index,
     });
 
-    await storage.pushDocUpdates(
+    const timestamp = await storage.pushDocUpdates(
       options.workspace,
       folderDocId,
       [update],
       options.user
     );
+
+    if (writer) {
+      writer['emitDocUpdatesPushed']({
+        spaceId: options.workspace,
+        docId: folderDocId,
+        updates: [update],
+        timestamp,
+        editor: options.user,
+      });
+    }
 
     return {
       success: true,
@@ -267,7 +279,8 @@ export const buildFolderCreateHandler = (
 export const buildFolderAddDocHandler = (
   ac: AccessController,
   storage: PgWorkspaceDocStorageAdapter,
-  _models: Models
+  _models: Models,
+  writer?: DocWriter
 ) => {
   return async (
     options: CopilotChatOptions,
@@ -324,12 +337,22 @@ export const buildFolderAddDocHandler = (
       index,
     });
 
-    await storage.pushDocUpdates(
+    const timestamp = await storage.pushDocUpdates(
       options.workspace,
       folderDocId,
       [update],
       options.user
     );
+
+    if (writer) {
+      writer['emitDocUpdatesPushed']({
+        spaceId: options.workspace,
+        docId: folderDocId,
+        updates: [update],
+        timestamp,
+        editor: options.user,
+      });
+    }
 
     return {
       success: true,
@@ -341,7 +364,8 @@ export const buildFolderAddDocHandler = (
 export const buildFolderRemoveDocHandler = (
   ac: AccessController,
   storage: PgWorkspaceDocStorageAdapter,
-  _models: Models
+  _models: Models,
+  writer?: DocWriter
 ) => {
   return async (
     options: CopilotChatOptions,
@@ -387,12 +411,22 @@ export const buildFolderRemoveDocHandler = (
     }
 
     const update = buildFolderUpdate(existingBin, { id: link.id }, true);
-    await storage.pushDocUpdates(
+    const timestamp = await storage.pushDocUpdates(
       options.workspace,
       folderDocId,
       [update],
       options.user
     );
+
+    if (writer) {
+      writer['emitDocUpdatesPushed']({
+        spaceId: options.workspace,
+        docId: folderDocId,
+        updates: [update],
+        timestamp,
+        editor: options.user,
+      });
+    }
 
     return {
       success: true,
