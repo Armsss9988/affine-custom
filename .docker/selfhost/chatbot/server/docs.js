@@ -833,6 +833,58 @@ router.post('/copilot/chat', async (req, res) => {
     {
       type: 'function',
       function: {
+        name: 'list_collections',
+        description: 'List all collections in the workspace.',
+        parameters: { type: 'object', properties: {} }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_collection',
+        description: 'Create a new collection in the workspace.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'The name of the collection to create' }
+          },
+          required: ['name']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'add_doc_to_collection',
+        description: 'Add a document to a collection.',
+        parameters: {
+          type: 'object',
+          properties: {
+            collectionId: { type: 'string', description: 'The ID of the collection' },
+            docId: { type: 'string', description: 'The ID of the document' }
+          },
+          required: ['collectionId', 'docId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'remove_doc_from_collection',
+        description: 'Remove a document from a collection.',
+        parameters: {
+          type: 'object',
+          properties: {
+            collectionId: { type: 'string', description: 'The ID of the collection' },
+            docId: { type: 'string', description: 'The ID of the document' }
+          },
+          required: ['collectionId', 'docId']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
         name: 'list_favorites',
         description: 'List the current user\'s favorite documents, folders, tags, or collections.',
         parameters: { type: 'object', properties: {} }
