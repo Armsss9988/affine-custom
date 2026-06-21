@@ -1,5 +1,6 @@
-import { LitElement, html, css } from 'lit';
-import { property, state, query } from 'lit/decorators.js';
+import { LitElement, html, css, nothing, type PropertyValues } from 'lit';
+import { property, state } from 'lit/decorators.js';
+import { ref } from 'lit/directives/ref.js';
 import { WithDisposable } from '@blocksuite/affine/global/lit';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { BaseSelection } from '@blocksuite/affine/store';
@@ -28,9 +29,9 @@ import {
 import { AIModelService } from '@affine/core/modules/ai-button/services/models';
 import { PeekViewService } from '@affine/core/modules/peek-view';
 import { createSignalFromObservable } from '@blocksuite/affine/shared/utils';
-import { extractSelectedContent } from '../utils/extract';
 import { isChatMessage, isChatAction } from './ai-chat-messages';
 import { CloseIcon, CommentIcon } from '@blocksuite/icons/lit';
+import type { CopilotChatHistoryFragment } from '@affine/graphql';
 
 export class AskAIChatDialog extends WithDisposable(LitElement) {
   static override styles = css`
@@ -117,13 +118,29 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
 
     .dialog-body {
       flex: 1;
-      height: 0;
+      min-height: 0;
       position: relative;
+      overflow: hidden;
     }
 
-    ai-chat-content {
-      height: 100% !important;
-      width: 100% !important;
+    .loading-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--affine-text-secondary-color, #8a8a8a);
+      font-size: 14px;
+    }
+
+    .error-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--affine-text-secondary-color, #8a8a8a);
+      font-size: 14px;
+      padding: 16px;
+      text-align: center;
     }
   `;
 
@@ -149,7 +166,8 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
   accessor onClose!: () => void;
 
   @state()
-  private accessor session: any = null;
+  private accessor session: CopilotChatHistoryFragment | null | undefined =
+    undefined;
 
   @state()
   private accessor isCreatingSession = true;
@@ -157,51 +175,61 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
   @state()
   private accessor isAddingComment = false;
 
-  @query('ai-chat-content')
-  private accessor chatContentElement!: AIChatContent | null;
+  private _chatContentEl: AIChatContent | null = null;
 
   private _cleanedUp = false;
 
-  private async _createTempSession() {
+  private readonly _createTempSession = async (): Promise<
+    CopilotChatHistoryFragment | undefined
+  > => {
+    if (!AIProvider.session) return undefined;
+    const session = await AIProvider.session.createSessionWithHistory({
+      docId: this.docId,
+      workspaceId: this.workspaceId,
+      promptName: 'Chat With AFFiNE AI',
+      reuseLatestChat: false,
+    });
+    return session ?? undefined;
+  };
+
+  private async _initSession() {
     this.isCreatingSession = true;
     try {
-      const session = await AIProvider.session?.createSessionWithHistory({
-        docId: this.docId,
-        workspaceId: this.workspaceId,
-        promptName: 'Chat With AFFiNE AI',
-        reuseLatestChat: false,
-      });
-      this.session = session;
+      const session = await this._createTempSession();
+      this.session = session ?? null;
     } catch (e) {
       console.error('Failed to create temporary AI chat session:', e);
+      this.session = null;
     } finally {
       this.isCreatingSession = false;
     }
 
+    // After session is ready + DOM updates, send initialPrompt
     if (this.session) {
-      // Trigger initial prompt in next tick after DOM renders
-      setTimeout(async () => {
-        const chatInput = this.shadowRoot?.querySelector(
+      await this.updateComplete;
+      // Small delay to allow ai-chat-content to finish rendering
+      setTimeout(() => {
+        const chatInput = this._chatContentEl?.shadowRoot?.querySelector(
+          'ai-chat-composer'
+        ) as any;
+        const inputEl = chatInput?.shadowRoot?.querySelector(
           'ai-chat-input'
         ) as any;
-        if (chatInput) {
-          const context = await extractSelectedContent(this.host);
-          if (context) {
-            chatInput.updateContext?.(context);
-          }
-          chatInput.send?.(this.initialPrompt);
+        if (inputEl && this.initialPrompt) {
+          inputEl.send?.(this.initialPrompt);
         }
-      }, 100);
+      }, 300);
     }
   }
 
   private async _cleanupSession() {
     if (this._cleanedUp) return;
     this._cleanedUp = true;
-    if (this.session?.sessionId) {
+    const sessionId = this.session?.sessionId;
+    if (sessionId) {
       try {
         await AIProvider.histories?.cleanup(this.workspaceId, this.docId, [
-          this.session.sessionId,
+          sessionId,
         ]);
       } catch (e) {
         console.error('Failed to clean up temporary AI chat session:', e);
@@ -209,15 +237,19 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
     }
   }
 
-  async addAsComment() {
-    if (this.isAddingComment || !this.chatContentElement) return;
+  private readonly _closeDialog = () => {
+    this._cleanupSession().catch(console.error);
+    this.onClose();
+  };
+
+  private readonly _addAsComment = async () => {
+    if (this.isAddingComment || !this._chatContentEl) return;
     this.isAddingComment = true;
 
     try {
-      const messages = this.chatContentElement.messages;
+      const messages = this._chatContentEl.messages;
       if (!messages || messages.length === 0) {
         alert('Chưa có nội dung hội thoại nào để thêm vào comment.');
-        this.isAddingComment = false;
         return;
       }
 
@@ -256,30 +288,32 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
         }
         await commentEntity.commitComment(commentId);
 
-        // Show toast using NotificationProvider
+        // Show toast
         const notificationProvider =
           this.host.std.getOptional(NotificationProvider);
         notificationProvider?.toast('Thêm comment thành công');
       }
 
-      // Close dialog
-      this.closeDialog();
+      this._closeDialog();
     } catch (e) {
       console.error('Failed to add chat as comment:', e);
       alert('Không thể tạo comment từ cuộc hội thoại này.');
     } finally {
       this.isAddingComment = false;
     }
-  }
-
-  closeDialog() {
-    this._cleanupSession().catch(console.error);
-    this.onClose();
-  }
+  };
 
   override connectedCallback() {
     super.connectedCallback();
-    this._createTempSession().catch(console.error);
+    this._initSession().catch(console.error);
+  }
+
+  override updated(changedProperties: PropertyValues) {
+    super.updated(changedProperties);
+    // When session becomes available, update chat content props
+    if (changedProperties.has('session') && this.session) {
+      this._updateChatContentProps();
+    }
   }
 
   override disconnectedCallback() {
@@ -287,42 +321,37 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
     this._cleanupSession().catch(console.error);
   }
 
-  override render() {
-    if (this.isCreatingSession) {
-      return html`
-        <div class="dialog-header">
-          <span class="dialog-title">AI Chat (Đang kết nối...)</span>
-          <button class="close-button" @click=${this.closeDialog}>
-            ${CloseIcon()}
-          </button>
-        </div>
-        <div
-          class="dialog-body"
-          style="display:flex;align-items:center;justify-content:center;color:var(--affine-text-secondary-color)"
-        >
-          Đang khởi tạo phiên chat...
-        </div>
-      `;
+  private _mountChatContent(container: HTMLElement | null) {
+    if (!container) {
+      this._chatContentEl = null;
+      return;
     }
 
-    if (!this.session) {
-      return html`
-        <div class="dialog-header">
-          <span class="dialog-title">AI Chat (Lỗi)</span>
-          <button class="close-button" @click=${this.closeDialog}>
-            ${CloseIcon()}
-          </button>
-        </div>
-        <div
-          class="dialog-body"
-          style="display:flex;align-items:center;justify-content:center;color:var(--affine-text-secondary-color)"
-        >
-          Không thể khởi tạo phiên chat AI. Vui lòng thử lại.
-        </div>
-      `;
+    // Avoid re-mounting if already attached
+    if (
+      this._chatContentEl &&
+      this._chatContentEl.parentElement === container
+    ) {
+      // Update mutable props
+      this._updateChatContentProps();
+      return;
     }
 
-    // Resolve configs for AIChatContent
+    // Clean up any previous element
+    if (this._chatContentEl) {
+      this._chatContentEl.remove();
+    }
+
+    const el = new AIChatContent();
+    this._chatContentEl = el;
+    this._updateChatContentProps();
+    container.appendChild(el);
+  }
+
+  private _updateChatContentProps() {
+    const el = this._chatContentEl;
+    if (!el || !this.session) return;
+
     const reasoningService = this.framework.get(AIReasoningService);
     const docDisplayMetaService = this.framework.get(DocDisplayMetaService);
     const workspaceService = this.framework.get(WorkspaceService);
@@ -332,12 +361,18 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
     const collectionService = this.framework.get(CollectionService);
     const docsService = this.framework.get(DocsService);
 
-    const reasoningConfig = {
+    el.independentMode = true;
+    el.host = this.host;
+    el.session = this.session;
+    el.createSession = this._createTempSession;
+    el.workspaceId = this.workspaceId;
+    el.docId = this.docId;
+    el.extensions = [];
+    el.reasoningConfig = {
       enabled: reasoningService.enabled,
       setEnabled: reasoningService.setEnabled,
     };
-
-    const docDisplayConfig = {
+    el.docDisplayConfig = {
       getIcon: (docId: string) => {
         return docDisplayMetaService.icon$(docId, { type: 'lit' }).value;
       },
@@ -386,78 +421,80 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
         return collection$.value?.info$.value.allowList ?? [];
       },
     };
-
-    const searchMenuConfig = {
-      getDocMenuGroup: (
-        query: string,
-        action: any,
-        abortSignal: AbortSignal
-      ) => {
-        return searchMenuService.getDocMenuGroup(query, action, abortSignal);
-      },
-      getTagMenuGroup: (
-        query: string,
-        action: any,
-        abortSignal: AbortSignal
-      ) => {
-        return searchMenuService.getTagMenuGroup(query, action, abortSignal);
-      },
+    el.searchMenuConfig = {
+      getDocMenuGroup: (query: string, action: any, abortSignal: AbortSignal) =>
+        searchMenuService.getDocMenuGroup(query, action, abortSignal),
+      getTagMenuGroup: (query: string, action: any, abortSignal: AbortSignal) =>
+        searchMenuService.getTagMenuGroup(query, action, abortSignal),
       getCollectionMenuGroup: (
         query: string,
         action: any,
         abortSignal: AbortSignal
-      ) => {
-        return searchMenuService.getCollectionMenuGroup(
-          query,
-          action,
-          abortSignal
-        );
-      },
+      ) => searchMenuService.getCollectionMenuGroup(query, action, abortSignal),
     };
+    el.serverService = this.framework.get(ServerService);
+    el.affineFeatureFlagService = this.framework.get(FeatureFlagService);
+    el.affineWorkspaceDialogService = this.framework.get(
+      WorkspaceDialogService
+    );
+    el.affineThemeService = this.framework.get(AppThemeService);
+    el.notificationService = this.host.std.get(NotificationProvider);
+    el.aiDraftService = this.framework.get(AIDraftService);
+    el.aiToolsConfigService = this.framework.get(AIToolsConfigService);
+    el.peekViewService = this.framework.get(PeekViewService);
+    el.subscriptionService = this.framework.get(SubscriptionService);
+    el.aiModelService = this.framework.get(AIModelService);
+    el.onContextChange = () => {};
+    el.onOpenDoc = () => {};
+    el.onAISubscribe = async () => {};
+    el.style.cssText =
+      'display:flex;flex-direction:column;height:100%;width:100%;';
+  }
 
-    const notificationService = this.host.std.get(NotificationProvider);
+  override render() {
+    const headerTitle = this.isCreatingSession
+      ? 'AI Chat (Đang kết nối...)'
+      : !this.session
+        ? 'AI Chat (Lỗi)'
+        : 'AI Chat';
+
+    const body = this.isCreatingSession
+      ? html`<div class="loading-state">Đang khởi tạo phiên chat...</div>`
+      : !this.session
+        ? html`<div class="error-state">
+            Không thể khởi tạo phiên chat AI. Vui lòng thử lại.
+          </div>`
+        : html`<div
+            class="chat-host"
+            style="height:100%;width:100%;"
+            ${ref((el: Element | undefined) => {
+              if (el instanceof HTMLElement) {
+                this._mountChatContent(el);
+              } else {
+                this._mountChatContent(null);
+              }
+            })}
+          ></div>`;
 
     return html`
       <div class="dialog-header">
-        <span class="dialog-title">AI Chat</span>
+        <span class="dialog-title">${headerTitle}</span>
         <div class="header-actions">
-          <button
-            class="action-button"
-            ?disabled=${this.isAddingComment}
-            @click=${this.addAsComment}
-          >
-            ${CommentIcon()} Add as comment
-          </button>
-          <button class="close-button" @click=${this.closeDialog}>
+          ${this.session
+            ? html`<button
+                class="action-button"
+                ?disabled=${this.isAddingComment}
+                @click=${this._addAsComment}
+              >
+                ${CommentIcon()} Add as comment
+              </button>`
+            : nothing}
+          <button class="close-button" @click=${this._closeDialog}>
             ${CloseIcon()}
           </button>
         </div>
       </div>
-      <div class="dialog-body">
-        <ai-chat-content
-          .independentMode=${true}
-          .host=${this.host}
-          .session=${this.session}
-          .workspaceId=${this.workspaceId}
-          .docId=${this.docId}
-          .reasoningConfig=${reasoningConfig}
-          .searchMenuConfig=${searchMenuConfig}
-          .docDisplayConfig=${docDisplayConfig}
-          .extensions=${[]}
-          .serverService=${this.framework.get(ServerService)}
-          .affineFeatureFlagService=${this.framework.get(FeatureFlagService)}
-          .affineWorkspaceDialogService=${this.framework.get(
-            WorkspaceDialogService
-          )}
-          .affineThemeService=${this.framework.get(AppThemeService)}
-          .notificationService=${notificationService}
-          .aiDraftService=${this.framework.get(AIDraftService)}
-          .aiToolsConfigService=${this.framework.get(AIToolsConfigService)}
-          .peekViewService=${this.framework.get(PeekViewService)}
-          .subscriptionService=${this.framework.get(SubscriptionService)}
-          .aiModelService=${this.framework.get(AIModelService)}
-        ></ai-chat-content>
-      </div>
+      <div class="dialog-body">${body}</div>
     `;
   }
 }
