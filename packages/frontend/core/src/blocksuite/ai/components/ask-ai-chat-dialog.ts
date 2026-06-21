@@ -32,6 +32,7 @@ import { createSignalFromObservable } from '@blocksuite/affine/shared/utils';
 import { isChatMessage, isChatAction } from './ai-chat-messages';
 import { CloseIcon, CommentIcon } from '@blocksuite/icons/lit';
 import type { CopilotChatHistoryFragment } from '@affine/graphql';
+import { registerAIAppEffects } from '../effects/app';
 
 export class AskAIChatDialog extends WithDisposable(LitElement) {
   static override styles = css`
@@ -194,11 +195,13 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
 
   private async _initSession() {
     this.isCreatingSession = true;
+    console.log('[AskAIChatDialog] Starting session init...');
     try {
       const session = await this._createTempSession();
+      console.log('[AskAIChatDialog] Session created:', session?.sessionId ?? 'null');
       this.session = session ?? null;
     } catch (e) {
-      console.error('Failed to create temporary AI chat session:', e);
+      console.error('[AskAIChatDialog] Failed to create session:', e);
       this.session = null;
     } finally {
       this.isCreatingSession = false;
@@ -207,18 +210,23 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
     // After session is ready + DOM updates, send initialPrompt
     if (this.session) {
       await this.updateComplete;
-      // Small delay to allow ai-chat-content to finish rendering
-      setTimeout(() => {
-        const chatInput = this._chatContentEl?.shadowRoot?.querySelector(
-          'ai-chat-composer'
-        ) as any;
-        const inputEl = chatInput?.shadowRoot?.querySelector(
-          'ai-chat-input'
-        ) as any;
-        if (inputEl && this.initialPrompt) {
-          inputEl.send?.(this.initialPrompt);
+      console.log('[AskAIChatDialog] DOM updated, chatContentEl:', this._chatContentEl);
+      
+      const trySend = (retries = 10) => {
+        if (!this._chatContentEl) {
+          if (retries > 0) setTimeout(() => trySend(retries - 1), 100);
+          return;
         }
-      }, 300);
+        const chatInput = this._chatContentEl.querySelector('ai-chat-composer') as any;
+        const inputEl = chatInput?.querySelector('ai-chat-input') as any;
+        console.log(`[AskAIChatDialog] trySend: chatInput=${!!chatInput}, inputEl=${!!inputEl}, sendMethod=${!!inputEl?.send}, retries=${retries}`);
+        if (inputEl && inputEl.send && this.initialPrompt) {
+          inputEl.send(this.initialPrompt).catch(console.error);
+        } else if (retries > 0) {
+          setTimeout(() => trySend(retries - 1), 100);
+        }
+      };
+      trySend();
     }
   }
 
@@ -305,6 +313,8 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
 
   override connectedCallback() {
     super.connectedCallback();
+    console.log('[AskAIChatDialog] Registering AI App Effects...');
+    registerAIAppEffects();
     this._initSession().catch(console.error);
   }
 
@@ -322,6 +332,7 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
   }
 
   private _mountChatContent(container: HTMLElement | null) {
+    console.log('[AskAIChatDialog] _mountChatContent called, container:', container, 'session:', this.session?.sessionId);
     if (!container) {
       this._chatContentEl = null;
       return;
@@ -344,13 +355,20 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
 
     const el = new AIChatContent();
     this._chatContentEl = el;
+    console.log('[AskAIChatDialog] Created AIChatContent element, setting props...');
     this._updateChatContentProps();
     container.appendChild(el);
+    console.log('[AskAIChatDialog] AIChatContent appended to container');
   }
 
   private _updateChatContentProps() {
     const el = this._chatContentEl;
-    if (!el || !this.session) return;
+    console.log('[AskAIChatDialog] _updateChatContentProps: el=', !!el, 'session=', this.session?.sessionId);
+    if (!el || !this.session) {
+      console.warn('[AskAIChatDialog] Skipping prop update: el or session missing');
+      return;
+    }
+    try {
 
     const reasoningService = this.framework.get(AIReasoningService);
     const docDisplayMetaService = this.framework.get(DocDisplayMetaService);
@@ -449,6 +467,10 @@ export class AskAIChatDialog extends WithDisposable(LitElement) {
     el.onAISubscribe = async () => {};
     el.style.cssText =
       'display:flex;flex-direction:column;height:100%;width:100%;';
+    console.log('[AskAIChatDialog] All props set on AIChatContent successfully');
+    } catch (e) {
+      console.error('[AskAIChatDialog] Error setting AIChatContent props:', e);
+    }
   }
 
   override render() {
