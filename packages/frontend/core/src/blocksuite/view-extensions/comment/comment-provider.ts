@@ -21,7 +21,7 @@ import type { FrameworkProvider } from '@toeverything/infra';
 
 import { DocCommentManagerService } from '../../../modules/comment/services/doc-comment-manager';
 
-function getPreviewFromSelections(
+export function getPreviewFromSelections(
   std: BlockStdScope,
   selections: BaseSelection[]
 ): string {

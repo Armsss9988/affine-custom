@@ -17,6 +17,7 @@ import { AskAIButton } from '../components/ask-ai-button';
 import { AskAIIcon } from '../components/ask-ai-icon';
 import { AskAIPanel } from '../components/ask-ai-panel';
 import { AskAIToolbarButton } from '../components/ask-ai-toolbar';
+import { AskAIChatDialog } from '../components/ask-ai-chat-dialog';
 import {
   AFFINE_AI_PANEL_WIDGET,
   AffineAIPanelWidget,
@@ -63,6 +64,7 @@ const editorElements = {
   'ask-ai-button': AskAIButton,
   'ask-ai-toolbar-button': AskAIToolbarButton,
   'ask-ai-panel': AskAIPanel,
+  'ask-ai-chat-dialog': AskAIChatDialog,
   'affine-edgeless-ai-chat': EdgelessAIChatBlockComponent,
   'affine-ai-chat': AIChatBlockComponent,
   'ai-chat-block-message': AIChatBlockMessage,

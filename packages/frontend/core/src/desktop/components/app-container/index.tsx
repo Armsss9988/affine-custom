@@ -95,7 +95,6 @@ const BrowserLayout = ({
 
   return (
     <div className={styles.browserAppViewContainer}>
-      <OpenInAppCard />
       {fallback ? <AppSidebarFallback /> : isInWorkspace && <RootAppSidebar />}
       <MainContainer>{children}</MainContainer>
     </div>

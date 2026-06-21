@@ -255,7 +255,7 @@ export const RootAppSidebar = memo((): ReactElement => {
       </SidebarScrollableContainer>
       <SidebarContainer className={bottomContainer}>
         <SidebarAudioPlayer />
-        {BUILD_CONFIG.isElectron ? <UpdaterButton /> : <AppDownloadButton />}
+        {BUILD_CONFIG.isElectron ? <UpdaterButton /> : null}
       </SidebarContainer>
     </AppSidebar>
   );

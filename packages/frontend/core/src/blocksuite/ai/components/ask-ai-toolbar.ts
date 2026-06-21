@@ -9,11 +9,11 @@ import { flip, offset } from '@floating-ui/dom';
 import { css, html, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 
-import { AIProvider } from '../provider';
 import { getAIPanelWidget } from '../utils/ai-widgets';
-import { extractSelectedContent } from '../utils/extract';
 import type { AffineAIPanelWidgetConfig } from '../widgets/ai-panel/type';
 import type { AIItemGroupConfig } from './ai-item/types';
+import type { FrameworkProvider } from '@toeverything/infra';
+import './ask-ai-chat-dialog';
 
 export class AskAIToolbarButton extends WithDisposable(LitElement) {
   static override styles = css`
@@ -30,6 +30,9 @@ export class AskAIToolbarButton extends WithDisposable(LitElement) {
 
   @property({ attribute: false })
   accessor host!: EditorHost;
+
+  @property({ attribute: false })
+  accessor framework!: FrameworkProvider;
 
   @property({ attribute: false })
   accessor actionGroups!: AIItemGroupConfig[];
@@ -71,17 +74,33 @@ export class AskAIToolbarButton extends WithDisposable(LitElement) {
   private readonly _generateAnswer: AffineAIPanelWidgetConfig['generateAnswer'] =
     ({ finish, input }) => {
       finish('success');
+      const selections = [...this.host.selection.value];
       const aiPanel = getAIPanelWidget(this.host);
       aiPanel.hide();
-      extractSelectedContent(this.host)
-        .then(context => {
-          AIProvider.slots.requestSendWithChat.next({
-            input,
-            context,
-            host: this.host,
-          });
-        })
-        .catch(console.error);
+      this._clearAbortController();
+
+      const dialogAbortController = new AbortController();
+      createLitPortal({
+        template: html`
+          <ask-ai-chat-dialog
+            .host=${this.host}
+            .framework=${this.framework}
+            .selections=${selections}
+            .workspaceId=${this.host.store.workspace.id}
+            .docId=${this.host.store.id}
+            .initialPrompt=${input}
+            .onClose=${() => dialogAbortController.abort()}
+          ></ask-ai-chat-dialog>
+        `,
+        computePosition: {
+          referenceElement: aiPanel,
+          placement: 'bottom-start',
+          middleware: [flip(), offset({ mainAxis: 8 })],
+          autoUpdate: true,
+        },
+        abortController: dialogAbortController,
+        closeOnClickAway: true,
+      });
     };
 
   private readonly _onClick = () => {

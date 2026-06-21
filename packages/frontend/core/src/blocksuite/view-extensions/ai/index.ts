@@ -64,7 +64,7 @@ export class AIViewExtension extends ViewExtensionProvider<AIViewOptions> {
         AiSlashMenuConfigExtension(),
         ToolbarModuleExtension({
           id: BlockFlavourIdentifier('custom:affine:note'),
-          config: toolbarAIEntryConfig(),
+          config: toolbarAIEntryConfig(framework),
         }),
       ]);
     }

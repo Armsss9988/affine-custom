@@ -1,3 +1,4 @@
+import type { FrameworkProvider } from '@toeverything/infra';
 import '../../components/ask-ai-button';
 
 import {
@@ -8,7 +9,9 @@ import { html } from 'lit';
 
 import { pageAIGroups } from '../../_common/config';
 
-export function toolbarAIEntryConfig(): ToolbarModuleConfig {
+export function toolbarAIEntryConfig(
+  framework: FrameworkProvider
+): ToolbarModuleConfig {
   return {
     actions: [
       {
@@ -19,6 +22,7 @@ export function toolbarAIEntryConfig(): ToolbarModuleConfig {
         content: ({ host }) => html`
           <ask-ai-toolbar-button
             .host=${host}
+            .framework=${framework}
             .actionGroups=${pageAIGroups}
           ></ask-ai-toolbar-button>
         `,

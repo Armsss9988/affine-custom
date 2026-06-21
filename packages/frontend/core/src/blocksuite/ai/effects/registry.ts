@@ -32,6 +32,7 @@ export const editorEffectElementTags = [
   'ask-ai-button',
   'ask-ai-toolbar-button',
   'ask-ai-panel',
+  'ask-ai-chat-dialog',
   'affine-edgeless-ai-chat',
   'affine-ai-chat',
   'ai-chat-block-message',
